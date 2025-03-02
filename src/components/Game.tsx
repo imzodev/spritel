@@ -30,6 +30,8 @@ const Game = () => {
 class GameScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private attackKey!: Phaser.Input.Keyboard.Key;
+  private lastDirection: string = 'down';  // Track the last direction for idle animations
 
   constructor() {
     super("GameScene");
@@ -83,59 +85,69 @@ class GameScene extends Phaser.Scene {
 
     // Keyboard input
     this.cursors = this.input.keyboard!.createCursorKeys();
+    this.attackKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     // Player animations based on LPC spritesheet format
-    // The walking animations are in these rows:
-    // Row 9: Walk Up (was labeled as Down)
-    // Row 10: Walk Left (was labeled as Right)
-    // Row 11: Walk Down (was labeled as Up)
-    // Row 12: Walk Right (was labeled as Left)
-
     const frameRate = 8;
     const framesPerRow = 13;
-    const walkUpRow = 8;     // Row 9 (0-based)
+
+    // Row indices for different animation types
+    const idleUpRow = 22;     // Row 22
+    const idleLeftRow = 23;   // Row 23
+    const idleDownRow = 24;   // Row 24
+    const idleRightRow = 25;  // Row 25
+    
+    const walkUpRow = 8;     // Row 9
     const walkLeftRow = 9;   // Row 10
     const walkDownRow = 10;  // Row 11
     const walkRightRow = 11; // Row 12
+
+    const attackUpRow = 12;    // Row 12
+    const attackLeftRow = 13;  // Row 13
+    const attackDownRow = 14;  // Row 14
+    const attackRightRow = 15; // Row 16
     
-    this.anims.create({
-      key: 'walk-down',
-      frames: this.anims.generateFrameNumbers('player', { 
-        start: walkDownRow * framesPerRow, 
-        end: walkDownRow * framesPerRow + 8
-      }),
-      frameRate,
-      repeat: -1
+    // Create idle animations with 2 frames
+    ['up', 'left', 'down', 'right'].forEach((direction, index) => {
+      const row = [idleUpRow, idleLeftRow, idleDownRow, idleRightRow][index];
+      this.anims.create({
+        key: `idle-${direction}`,
+        frames: this.anims.generateFrameNumbers('player', {
+          start: row * framesPerRow,
+          end: row * framesPerRow + 1 // Use both frames
+        }),
+        frameRate: 1.5,
+        repeat: -1,
+        yoyo: true // Make it ping-pong between frames
+      });
     });
 
-    this.anims.create({
-      key: 'walk-left',
-      frames: this.anims.generateFrameNumbers('player', { 
-        start: walkLeftRow * framesPerRow, 
-        end: walkLeftRow * framesPerRow + 8
-      }),
-      frameRate,
-      repeat: -1
+    // Create walk animations
+    ['up', 'left', 'down', 'right'].forEach((direction, index) => {
+      const row = [walkUpRow, walkLeftRow, walkDownRow, walkRightRow][index];
+      this.anims.create({
+        key: `walk-${direction}`,
+        frames: this.anims.generateFrameNumbers('player', {
+          start: row * framesPerRow,
+          end: row * framesPerRow + 8
+        }),
+        frameRate,
+        repeat: -1
+      });
     });
 
-    this.anims.create({
-      key: 'walk-right',
-      frames: this.anims.generateFrameNumbers('player', { 
-        start: walkRightRow * framesPerRow, 
-        end: walkRightRow * framesPerRow + 8
-      }),
-      frameRate,
-      repeat: -1
-    });
-
-    this.anims.create({
-      key: 'walk-up',
-      frames: this.anims.generateFrameNumbers('player', { 
-        start: walkUpRow * framesPerRow, 
-        end: walkUpRow * framesPerRow + 8
-      }),
-      frameRate,
-      repeat: -1
+    // Create attack animations
+    ['up', 'left', 'down', 'right'].forEach((direction, index) => {
+      const row = [attackUpRow, attackLeftRow, attackDownRow, attackRightRow][index];
+      this.anims.create({
+        key: `attack-${direction}`,
+        frames: this.anims.generateFrameNumbers('player', {
+          start: row * framesPerRow,
+          end: row * framesPerRow + 5
+        }),
+        frameRate: 12,
+        repeat: 0
+      });
     });
 
     // Set camera bounds to map size
@@ -150,40 +162,70 @@ class GameScene extends Phaser.Scene {
     const speed = 160;
     this.player.setVelocity(0);
 
-    // Diagonal movement
-    if (this.cursors.left.isDown || this.cursors.right.isDown || 
-        this.cursors.up.isDown || this.cursors.down.isDown) {
+    // Handle attack animation
+    if (Phaser.Input.Keyboard.JustDown(this.attackKey)) {
+      const attackAnim = `attack-${this.lastDirection}`;
+      this.player.anims.play(attackAnim);
       
-      let velocityX = 0;
-      let velocityY = 0;
-      let animation = '';
+      // Listen for animation complete
+      this.player.once('animationcomplete', () => {
+        // Return to idle when attack finishes
+        console.log('attack complete');
+        console.log("Idle animation: ", `idle-${this.lastDirection}`);
+        this.player.anims.play(`idle-${this.lastDirection}`);
+        
+      });
+      
+      return; // Don't allow movement during attack
+    }
 
-      if (this.cursors.left.isDown) {
-        velocityX = -speed;
-        animation = 'walk-left';
-      } else if (this.cursors.right.isDown) {
-        velocityX = speed;
-        animation = 'walk-right';
-      }
+    // Don't allow movement if we're in the middle of an attack
+    if (this.player.anims.currentAnim && 
+        this.player.anims.currentAnim.key.startsWith('attack-') &&
+        this.player.anims.isPlaying) {
+      return;
+    }
 
-      if (this.cursors.up.isDown) {
-        velocityY = -speed;
-        if (!animation) animation = 'walk-up';
-      } else if (this.cursors.down.isDown) {
-        velocityY = speed;
-        if (!animation) animation = 'walk-down';
-      }
+    // Movement and walking animations
+    let velocityX = 0;
+    let velocityY = 0;
+    let direction = '';
 
-      // Normalize diagonal movement
-      if (velocityX !== 0 && velocityY !== 0) {
-        velocityX *= Math.SQRT1_2;
-        velocityY *= Math.SQRT1_2;
-      }
+    if (this.cursors.left.isDown) {
+      velocityX = -speed;
+      direction = 'left';
+    } else if (this.cursors.right.isDown) {
+      velocityX = speed;
+      direction = 'right';
+    }
 
-      this.player.setVelocity(velocityX, velocityY);
-      this.player.anims.play(animation, true);
+    if (this.cursors.up.isDown) {
+      velocityY = -speed;
+      if (!direction) direction = 'up';
+    } else if (this.cursors.down.isDown) {
+      velocityY = speed;
+      if (!direction) direction = 'down';
+    }
+
+    // Normalize diagonal movement
+    if (velocityX !== 0 && velocityY !== 0) {
+      velocityX *= Math.SQRT1_2;
+      velocityY *= Math.SQRT1_2;
+    }
+
+    this.player.setVelocity(velocityX, velocityY);
+
+    // Update animations
+    if (direction) {
+      this.lastDirection = direction;
+      this.player.anims.play(`walk-${direction}`, true);
     } else {
-      this.player.anims.stop();
+      // Play idle animation in the last direction when stopped
+      const idleAnim = `idle-${this.lastDirection}`;
+      if (!this.player.anims.isPlaying || !this.player.anims.currentAnim?.key.startsWith('idle-')) {
+        console.log('Playing idle animation:', idleAnim);
+        this.player.anims.play(idleAnim, true);
+      }
     }
   }
 }
