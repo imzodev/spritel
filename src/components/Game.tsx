@@ -9,7 +9,7 @@ const Game = () => {
       height: 600,
       physics: {
         default: "arcade",
-        arcade: { gravity: { y: 0 }, debug: false }
+        arcade: { gravity: { y: 0 }, debug: true } // Enable debug mode to see collision boxes
       },
       scene: GameScene,
       pixelArt: true,
@@ -32,6 +32,7 @@ class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private attackKey!: Phaser.Input.Keyboard.Key;
   private lastDirection: string = 'down';  // Track the last direction for idle animations
+  private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
 
   constructor() {
     super("GameScene");
@@ -62,11 +63,26 @@ class GameScene extends Phaser.Scene {
     // Create layers
     const groundLayer = map.createLayer('Ground', tileset, 0, 0);
     const decorationLayer = map.createLayer('Decoration', tileset, 0, 0);
+    this.collisionLayer = map.createLayer('Collision', tileset, 0, 0);
 
-    if (!groundLayer || !decorationLayer) {
+    if (!groundLayer || !decorationLayer || !this.collisionLayer) {
       console.error('Failed to create layers');
       return;
     }
+    
+    // Set collision on the collision layer
+    this.collisionLayer.setCollisionByExclusion([-1, 0]);
+    
+    // Set the collision callback to improve accuracy
+    this.physics.world.setFPS(60); // Higher FPS for better collision detection
+    this.physics.world.TILE_BIAS = 8; // Reduce the tile bias to improve collision detection
+    
+    // For debugging - show collision areas
+    this.collisionLayer.renderDebug(this.add.graphics(), {
+      tileColor: null,
+      collidingTileColor: new Phaser.Display.Color(255, 0, 0, 200), // Bright red with higher opacity
+      faceColor: new Phaser.Display.Color(0, 255, 0, 200) // Bright green with higher opacity
+    });
 
     // Create player
     this.player = this.physics.add.sprite(100, 100, 'player');
@@ -74,6 +90,13 @@ class GameScene extends Phaser.Scene {
     
     // Scale the player since LPC sprites are 64x64
     this.player.setScale(0.5); // This will make it 32x32
+    
+    // Adjust the player's physics body to better match the visible sprite
+    this.player.body.setSize(20, 28); // Make hitbox smaller to match visible character
+    this.player.body.setOffset(22, 36); // Adjust hitbox position to be at the character's feet
+    
+    // Set up collision between player and collision layer
+    this.physics.add.collider(this.player, this.collisionLayer);
 
     // Camera follows player
     this.cameras.main.startFollow(this.player);
@@ -154,8 +177,12 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
   }
 
+
+  
+
+  
   update() {
-    if (!this.player || !this.cursors) {
+    if (!this.player || !this.cursors || !this.collisionLayer) {
       return;
     }
 
