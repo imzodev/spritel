@@ -9,7 +9,7 @@ const Game = () => {
       height: 600,
       physics: {
         default: "arcade",
-        arcade: { gravity: { y: 0 }, debug: true } // Enable debug mode to see collision boxes
+        arcade: { gravity: { x: 0, y: 0 }, debug: true } // Enable debug mode to see collision boxes
       },
       scene: GameScene,
       pixelArt: true,
@@ -32,7 +32,7 @@ class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private attackKey!: Phaser.Input.Keyboard.Key;
   private lastDirection: string = 'down';  // Track the last direction for idle animations
-  private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
+  private collisionLayer!: Phaser.Tilemaps.TilemapLayer | null;
 
   constructor() {
     super("GameScene");
@@ -92,11 +92,17 @@ class GameScene extends Phaser.Scene {
     this.player.setScale(0.5); // This will make it 32x32
     
     // Adjust the player's physics body to better match the visible sprite
-    this.player.body.setSize(20, 28); // Make hitbox smaller to match visible character
-    this.player.body.setOffset(22, 36); // Adjust hitbox position to be at the character's feet
+    if (this.player.body) {
+      this.player.body.setSize(20, 28); // Make hitbox smaller to match visible character
+      this.player.body.setOffset(22, 36); // Adjust hitbox position to be at the character's feet
+    } else {
+      console.error('Failed to set player physics body');
+    }
     
     // Set up collision between player and collision layer
-    this.physics.add.collider(this.player, this.collisionLayer);
+    if (this.player && this.collisionLayer) {
+      this.physics.add.collider(this.player, this.collisionLayer);
+    }
 
     // Camera follows player
     this.cameras.main.startFollow(this.player);
@@ -107,8 +113,13 @@ class GameScene extends Phaser.Scene {
     this.physics.world.bounds.height = map.heightInPixels;
 
     // Keyboard input
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.attackKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    if (this.input.keyboard) {
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    } else {
+      console.error("Keyboard input not available");
+      return;
+    }
 
     // Player animations based on LPC spritesheet format
     const frameRate = 8;
