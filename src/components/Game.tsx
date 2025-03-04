@@ -1,12 +1,16 @@
 import Phaser from "phaser";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 const Game = () => {
+  const gameContainerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    if (!gameContainerRef.current) return;
+    
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
-      width: 800,
-      height: 600,
+      width: 768,
+      height: 480,
       physics: {
         default: "arcade",
         arcade: { gravity: { x: 0, y: 0 }, debug: true } // Enable debug mode to see collision boxes
@@ -14,7 +18,7 @@ const Game = () => {
       scene: GameScene,
       pixelArt: true,
       scale: {
-        mode: Phaser.Scale.FIT,
+        mode: Phaser.Scale.FIT, // Use STRETCH to fill the entire screen
         autoCenter: Phaser.Scale.CENTER_BOTH
       }
     };
@@ -24,7 +28,9 @@ const Game = () => {
     return () => game.destroy(true);
   }, []);
 
-  return <div id="game-container"></div>;
+  return (
+    <div id="game-container" ref={gameContainerRef} className=""></div>
+  );
 };
 
 class GameScene extends Phaser.Scene {
@@ -106,7 +112,8 @@ class GameScene extends Phaser.Scene {
 
     // Camera follows player
     this.cameras.main.startFollow(this.player);
-    this.cameras.main.setZoom(2);
+    let zoom = 2.0; // Set a fixed zoom of 2.0 for all devices
+    this.cameras.main.setZoom(zoom);
 
     // Set world bounds based on map size
     this.physics.world.bounds.width = map.widthInPixels;
