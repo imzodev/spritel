@@ -1,8 +1,11 @@
 import Phaser from "phaser";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import MobileControls from "./MobileControls";
 
 const Game = () => {
   const gameContainerRef = useRef<HTMLDivElement>(null);
+  const [gameInstance, setGameInstance] = useState<Phaser.Game | null>(null);
+  const [gameScene, setGameScene] = useState<GameScene | null>(null);
 
   useEffect(() => {
     if (!gameContainerRef.current) return;
@@ -24,12 +27,57 @@ const Game = () => {
     };
 
     const game = new Phaser.Game(config);
+    setGameInstance(game);
+    
+    // Get a reference to the game scene for mobile controls
+    const checkForScene = () => {
+      try {
+        const scene = game.scene.getScene('GameScene') as GameScene;
+        if (scene) {
+          setGameScene(scene);
+          return true;
+        }
+      } catch (e) {
+        console.log('Scene not ready yet');
+      }
+      return false;
+    };
+
+    // Try immediately
+    if (!checkForScene()) {
+      // If not available, try again after a short delay
+      const intervalId = setInterval(() => {
+        if (checkForScene()) {
+          clearInterval(intervalId);
+        }
+      }, 100);
+    }
 
     return () => game.destroy(true);
   }, []);
 
+  // Handle mobile control events
+  const handleDirectionPress = (direction: string | null) => {
+    if (!gameScene) return;
+    gameScene.setVirtualControlDirection(direction);
+  };
+
+  const handleAttackPress = () => {
+    if (!gameScene) return;
+    gameScene.triggerVirtualAttack();
+  };
+
   return (
-    <div id="game-container" ref={gameContainerRef} className=""></div>
+    <div className="relative w-full h-full">
+      <div id="game-container" ref={gameContainerRef} className="fixed inset-0 w-screen h-screen z-10"></div>
+      {/* Only show mobile controls on mobile devices */}
+      <div className="pointer-events-none z-20">
+        <MobileControls 
+          onDirectionPress={handleDirectionPress}
+          onAttackPress={handleAttackPress}
+        />
+      </div>
+    </div>
   );
 };
 
@@ -39,9 +87,15 @@ class GameScene extends Phaser.Scene {
   private attackKey!: Phaser.Input.Keyboard.Key;
   private lastDirection: string = 'down';  // Track the last direction for idle animations
   private collisionLayer!: Phaser.Tilemaps.TilemapLayer | null;
+  
+  // Virtual controls for mobile
+  private virtualDirection: string | null = null;
+  private virtualAttackTriggered: boolean = false;
 
   constructor() {
-    super("GameScene");
+    super({
+      key: "GameScene"
+    });
   }
 
   preload() {
@@ -199,6 +253,17 @@ class GameScene extends Phaser.Scene {
   
 
   
+  // Methods for virtual controls (mobile)
+  public setVirtualControlDirection(direction: string | null) {
+    console.log('Setting virtual direction:', direction);
+    this.virtualDirection = direction;
+  }
+
+  public triggerVirtualAttack() {
+    console.log('Virtual attack triggered');
+    this.virtualAttackTriggered = true;
+  }
+
   update() {
     if (!this.player || !this.cursors || !this.collisionLayer) {
       return;
@@ -207,8 +272,9 @@ class GameScene extends Phaser.Scene {
     const speed = 160;
     this.player.setVelocity(0);
 
-    // Handle attack animation
-    if (Phaser.Input.Keyboard.JustDown(this.attackKey)) {
+    // Handle attack animation (keyboard or virtual)
+    if (Phaser.Input.Keyboard.JustDown(this.attackKey) || this.virtualAttackTriggered) {
+      this.virtualAttackTriggered = false; // Reset virtual attack trigger
       const attackAnim = `attack-${this.lastDirection}`;
       this.player.anims.play(attackAnim);
       
@@ -236,6 +302,7 @@ class GameScene extends Phaser.Scene {
     let velocityY = 0;
     let direction = '';
 
+    // Handle keyboard input
     if (this.cursors.left.isDown) {
       velocityX = -speed;
       direction = 'left';
@@ -250,6 +317,28 @@ class GameScene extends Phaser.Scene {
     } else if (this.cursors.down.isDown) {
       velocityY = speed;
       if (!direction) direction = 'down';
+    }
+    
+    // Handle virtual controls (mobile)
+    if (this.virtualDirection) {
+      switch (this.virtualDirection) {
+        case 'left':
+          velocityX = -speed;
+          direction = 'left';
+          break;
+        case 'right':
+          velocityX = speed;
+          direction = 'right';
+          break;
+        case 'up':
+          velocityY = -speed;
+          if (!direction) direction = 'up';
+          break;
+        case 'down':
+          velocityY = speed;
+          if (!direction) direction = 'down';
+          break;
+      }
     }
 
     // Normalize diagonal movement
