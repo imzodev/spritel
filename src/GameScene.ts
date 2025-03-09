@@ -25,6 +25,10 @@ class GameScene extends Phaser.Scene {
     // Load tileset
     this.load.image('tiles', '/assets/beginnertileset.png');
     this.load.tilemapTiledJSON('map', '/assets/maps/map_0_0.json');
+    this.load.tilemapTiledJSON('map_-1_0', '/assets/maps/map_-1_0.json');
+    this.load.tilemapTiledJSON('map_1_0', '/assets/maps/map_1_0.json');
+    this.load.tilemapTiledJSON('map_0_-1', '/assets/maps/map_0_-1.json');
+    this.load.tilemapTiledJSON('map_0_1', '/assets/maps/map_0_1.json');
 
     
     // Load player spritesheet

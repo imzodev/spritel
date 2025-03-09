@@ -26,6 +26,7 @@ class MapManager {
   public readonly mapHeight: number;
   public readonly tileSize: number;
   private mapCoordinates: MapCoordinate[];
+  private sideTransitionSize: number; // Number of pixels to transition to the next map, if we are this amount of pixels away from the edge we will transition to the next map
 
   constructor(game: Phaser.Scene) {
     this.game = game;
@@ -35,6 +36,7 @@ class MapManager {
     this.mapWidth = 24;
     this.mapHeight = 15;
     this.tileSize = 16;
+    this.sideTransitionSize = 5;
     this.mapCoordinates = [];
   }
 
@@ -42,8 +44,10 @@ class MapManager {
   if (this.isMapLoaded(x, y)) return;
 
   const mapName = `map_${x}_${y}.json`;
-  this.game.load.json(mapName, `assets/maps/${mapName}`);
-  this.game.load.tilemapTiledJSON(mapName, `assets/maps/${mapName}`); // Use mapName as the key
+  console.log(`Loading map: ${mapName}`);
+  
+  this.game.load.json(mapName, `/assets/maps/${mapName}`);
+  this.game.load.tilemapTiledJSON(mapName, `/assets/maps/${mapName}`); // Use mapName as the key
 
   this.game.load.once('complete', () => {
     this.currentMap = this.game.cache.json.get(mapName);
@@ -88,14 +92,15 @@ class MapManager {
     map.createLayer('Ground', tileset, 0, 0);
     map.createLayer('Decoration', tileset, 0, 0);
     const collisionLayer = map.createLayer('Collision', tileset, 0, 0);
-
+    console.log('Collision layer:', collisionLayer);
+    
     if (collisionLayer) {
       collisionLayer.setCollisionByExclusion([-1, 0]);
     }
 
     // Update world bounds
-    this.game.physics.world.bounds.width = map.widthInPixels;
-    this.game.physics.world.bounds.height = map.heightInPixels;
+    // this.game.physics.world.bounds.width = map.widthInPixels;
+    // this.game.physics.world.bounds.height = map.heightInPixels;
     this.game.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
   }
   checkMapTransition(player: Phaser.Physics.Arcade.Sprite): void {
@@ -109,12 +114,15 @@ class MapManager {
     // Print the player position every 5 seconds
     if (this.game.time.now % 5000 < 16.66) {
       console.log(`Player position: (${player.x}, ${player.y})`);
+      console.log(`Current map: (${this.currentMapX}, ${this.currentMapY})`);
+      console.log(`Map dimensions: ${this.currentMap.width}x${this.currentMap.height}`);
+      console.log(`Tile dimensions: ${this.currentMap.tilewidth}x${this.currentMap.tileheight}`);
       console.log(`Map bounds: 0,0 to ${mapWidthPixels},${mapHeightPixels}`);
     }
     
 
     // Check horizontal transitions
-    if (player.x < 0) {
+    if (player.x <= this.sideTransitionSize) {
       console.log('Triggering WEST transition');
       this.transitionToMap('west', player);
     } else if (player.x >= mapWidthPixels) {
@@ -151,7 +159,11 @@ class MapManager {
         break;
       case 'west':
         newX--;
+        console.log(`mapWidth: ${this.mapWidth}`);
+        console.log(`tileSize: ${this.tileSize}`);
+        console.log('Setting player position to:', (this.mapWidth - 1) * this.tileSize);
         player.x = (this.mapWidth - 1) * this.tileSize;
+        // player.x = 379;
         break;
     }
 
