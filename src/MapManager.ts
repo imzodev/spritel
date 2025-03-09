@@ -49,6 +49,7 @@ class MapManager {
     this.currentMap = this.game.cache.json.get(mapName);
     this.currentMapX = x;
     this.currentMapY = y;
+    console.log(`Loaded map at coordinates: (${x}, ${y})`);
     this.mapCoordinates.push({ x, y });
     this.createMap();
   });
@@ -97,20 +98,36 @@ class MapManager {
     this.game.physics.world.bounds.height = map.heightInPixels;
     this.game.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
   }
-
   checkMapTransition(player: Phaser.Physics.Arcade.Sprite): void {
-    const playerX = player.x / this.tileSize;
-    const playerY = player.y / this.tileSize;
+    if (!this.currentMap) return;
+    
+    // Get actual map dimensions from loaded data
+    const mapWidthPixels = this.currentMap.width * this.currentMap.tilewidth;
+    const mapHeightPixels = this.currentMap.height * this.currentMap.tileheight;
 
-    if (playerX < 0) {
+    // Debugging logs
+    // Print the player position every 5 seconds
+    if (this.game.time.now % 5000 < 16.66) {
+      console.log(`Player position: (${player.x}, ${player.y})`);
+      console.log(`Map bounds: 0,0 to ${mapWidthPixels},${mapHeightPixels}`);
+    }
+    
+
+    // Check horizontal transitions
+    if (player.x < 0) {
+      console.log('Triggering WEST transition');
       this.transitionToMap('west', player);
-    } else if (playerX >= this.mapWidth) {
+    } else if (player.x >= mapWidthPixels) {
+      console.log('Triggering EAST transition');
       this.transitionToMap('east', player);
     }
 
-    if (playerY < 0) {
+    // Check vertical transitions
+    if (player.y < 0) {
+      console.log('Triggering NORTH transition');
       this.transitionToMap('north', player);
-    } else if (playerY >= this.mapHeight) {
+    } else if (player.y >= mapHeightPixels) {
+      console.log('Triggering SOUTH transition');
       this.transitionToMap('south', player);
     }
   }
