@@ -74,7 +74,28 @@ class MapManager {
   }
 
   private createMap(): void {
-    // Create the map layers and tiles here
+    const mapKey = `map_${this.currentMapX}_${this.currentMapY}`;
+    const map = this.game.make.tilemap({ key: mapKey });
+    const tileset = map.addTilesetImage('beginnertileset', 'tiles');
+
+    if (!tileset) {
+      console.error('Failed to add tileset');
+      return;
+    }
+
+    // Create layers
+    map.createLayer('Ground', tileset, 0, 0);
+    map.createLayer('Decoration', tileset, 0, 0);
+    const collisionLayer = map.createLayer('Collision', tileset, 0, 0);
+
+    if (collisionLayer) {
+      collisionLayer.setCollisionByExclusion([-1, 0]);
+    }
+
+    // Update world bounds
+    this.game.physics.world.bounds.width = map.widthInPixels;
+    this.game.physics.world.bounds.height = map.heightInPixels;
+    this.game.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
   }
 
   checkMapTransition(player: Phaser.Physics.Arcade.Sprite): void {

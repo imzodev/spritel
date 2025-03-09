@@ -204,8 +204,11 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.mapManager.checkMapTransition(this.player); // Call mapManager's checkMapTransition
+    this.handlePlayerMovement();
+    this.mapManager.checkMapTransition(this.player);
+  }
 
+  private handlePlayerMovement() {
     const speed = 160;
     this.player.setVelocity(0);
 
