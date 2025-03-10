@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import GameScene from './GameScene';
 
 interface MapData {
   version: string;
@@ -92,16 +93,16 @@ class MapManager {
     map.createLayer('Ground', tileset, 0, 0);
     map.createLayer('Decoration', tileset, 0, 0);
     const collisionLayer = map.createLayer('Collision', tileset, 0, 0);
-    console.log('Collision layer:', collisionLayer);
-    
-    if (collisionLayer) {
-      collisionLayer.setCollisionByExclusion([-1, 0]);
-    }
 
     // Update world bounds
     // this.game.physics.world.bounds.width = map.widthInPixels;
     // this.game.physics.world.bounds.height = map.heightInPixels;
     this.game.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+
+    const gameScene = this.game.scene.get('GameScene') as GameScene;
+    if (gameScene && collisionLayer) {
+      gameScene.setCollisionLayer(collisionLayer); // Must exist in GameScene
+    }
   }
   checkMapTransition(player: Phaser.Physics.Arcade.Sprite): void {
     if (!this.currentMap) return;

@@ -10,11 +10,42 @@ class GameScene extends Phaser.Scene {
   private mapManager!: MapManager; // Declare mapManager
   private virtualDirection: string | null = null;
   private virtualAttackTriggered: boolean = false;
+  private playerCollider!: Phaser.Physics.Arcade.Collider | null; // New property for the collider
 
   constructor() {
     super({
       key: "GameScene"
     });
+  }
+
+  // Method to destroy existing layers
+  public destroyCurrentLayers() {
+    if (this.playerCollider) {
+      this.physics.world.removeCollider(this.playerCollider); // Remove collider
+      this.playerCollider = null;
+    }
+  }
+
+  // Method to set the new collision layer and collider
+  public setCollisionLayer(newLayer: Phaser.Tilemaps.TilemapLayer | null) {
+    this.destroyCurrentLayers(); // Ensure old layers/collider are removed
+
+    
+    if (this.player && newLayer) {
+      console.log("Setting collision layer");
+      
+      newLayer.setCollisionByExclusion([-1, 0]);
+      newLayer.renderDebug(this.add.graphics(), {
+        tileColor: null,
+        collidingTileColor: new Phaser.Display.Color(255, 0, 0, 20),
+        faceColor: new Phaser.Display.Color(0, 255, 0, 200)
+      });
+      // Create new collider and store it
+      this.playerCollider = this.physics.add.collider(
+        this.player,
+        newLayer
+      );
+    }
   }
 
   preload() {
@@ -64,6 +95,7 @@ class GameScene extends Phaser.Scene {
     const decorationLayer = map.createLayer('Decoration', tileset, 0, 0);
     this.collisionLayer = map.createLayer('Collision', tileset, 0, 0);
     
+    
     if (!groundLayer || !decorationLayer || !this.collisionLayer) {
       console.error('Failed to create layers');
       return;
@@ -100,7 +132,7 @@ class GameScene extends Phaser.Scene {
     
     // Set up collision between player and collision layer
     if (this.player && this.collisionLayer) {
-      this.physics.add.collider(this.player, this.collisionLayer);
+      this.playerCollider = this.physics.add.collider(this.player, this.collisionLayer);
     }
 
     // Camera follows player
