@@ -215,6 +215,7 @@ class GameScene extends Phaser.Scene {
   private handlePlayerMovement() {
     const speed = 160;
     this.player.setVelocity(0);
+    this.player.setDepth(10); // Ensure the player renders above the tiles
 
     // Handle attack animation (keyboard or virtual)
     if (Phaser.Input.Keyboard.JustDown(this.attackKey) || this.virtualAttackTriggered) {
