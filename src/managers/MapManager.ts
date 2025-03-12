@@ -125,10 +125,6 @@ export class MapManager {
         };
     }
 
-    private getMapAt(x: number, y: number): MapCoordinate | null {
-        return this.isMapLoaded(x, y) ? { x, y } : null;
-    }
-
     private createMap(): void {
         if (!this.currentMap) return;
 
