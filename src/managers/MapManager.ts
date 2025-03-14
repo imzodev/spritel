@@ -63,9 +63,12 @@ export class MapManager {
             this.currentPosition = { x, y };
             this.loadedMaps.add(mapKey);
             this.createMap();
+
+            // Preload adjacent maps after current map is loaded
+            await this.preloadAdjacentMaps();
         } catch (error) {
             console.error(`Failed to load map ${mapKey}:`, error);
-            throw error; // Propagate the error to handle it in the transition
+            throw error;
         }
     }
 
@@ -84,22 +87,23 @@ export class MapManager {
     }
 
     private destroyCurrentMap(): void {
-        try {
-            // Destroy all current layers
-            Object.values(this.currentLayers).forEach(layer => {
-                if (layer) {
-                    layer.destroy();
-                }
-            });
-            this.currentLayers = {};
-
-            // Destroy the current tilemap
-            const tilemap = this.scene.make.tilemap({ key: this.getMapKey(this.currentPosition.x, this.currentPosition.y) });
-            if (tilemap) {
-                tilemap.destroy();
+        // Clear collision layer first
+        const gameScene = this.scene as GameScene;
+        gameScene.setCollisionLayer(null);
+        
+        // Then destroy the layers
+        Object.values(this.currentLayers).forEach(layer => {
+            if (layer) {
+                layer.destroy();
             }
-        } catch (error) {
-            console.error('Error destroying current map:', error);
+        });
+        this.currentLayers = {};
+
+        // Finally destroy the tilemap
+        const mapKey = this.getMapKey(this.currentPosition.x, this.currentPosition.y);
+        const tilemap = this.scene.make.tilemap({ key: mapKey });
+        if (tilemap) {
+            tilemap.destroy();
         }
     }
 
@@ -125,13 +129,10 @@ export class MapManager {
         };
     }
 
-    private createMap(): void {
-        if (!this.currentMap) return;
-
-        const mapKey = this.getMapKey(
-            this.currentPosition.x,
-            this.currentPosition.y
-        );
+    private async createMap(): Promise<void> {
+        const mapKey = this.getMapKey(this.currentPosition.x, this.currentPosition.y);
+        console.log('Creating new map:', mapKey);
+        
         const map = this.scene.make.tilemap({ key: mapKey });
         const tileset = map.addTilesetImage("beginnertileset", "tiles");
 
@@ -140,11 +141,25 @@ export class MapManager {
             return;
         }
 
+        console.log('Creating map layers...');
         this.currentLayers = {
             ground: map.createLayer("Ground", tileset, 0, 0),
             decoration: map.createLayer("Decoration", tileset, 0, 0),
             collision: map.createLayer("Collision", tileset, 0, 0)
         };
+
+        console.log('Layers created:', {
+            ground: !!this.currentLayers.ground,
+            decoration: !!this.currentLayers.decoration,
+            collision: !!this.currentLayers.collision
+        });
+
+        if (this.currentLayers.collision) {
+            console.log('Setting up collision layer...');
+            const gameScene = this.scene as GameScene;
+            gameScene.setCollisionLayer(this.currentLayers.collision);
+            console.log('Collision layer set up complete');
+        }
 
         this.scene.cameras.main.setBounds(
             0,
@@ -152,11 +167,6 @@ export class MapManager {
             map.widthInPixels,
             map.heightInPixels
         );
-
-        const gameScene = this.scene as GameScene;
-        if (gameScene.setCollisionLayer && this.currentLayers.collision) {
-            gameScene.setCollisionLayer(this.currentLayers.collision);
-        }
     }
 
     public checkMapTransition(player: Phaser.Physics.Arcade.Sprite): void {
@@ -184,71 +194,47 @@ export class MapManager {
     ): Promise<void> {
         if (this.isTransitioning) return;
         
-        const newPosition = { ...this.currentPosition };
-        const mapWidth = this.mapDimensions.width * this.tileSize;
-        const mapHeight = this.mapDimensions.height * this.tileSize;
-        
-        // Calculate new position first
-        switch (direction) {
-            case "north":
-                newPosition.y--;
-                break;
-            case "south":
-                newPosition.y++;
-                break;
-            case "east":
-                newPosition.x++;
-                break;
-            case "west":
-                newPosition.x--;
-                break;
-        }
-
-        // Check if the target map exists before proceeding
-        if (!this.isMapAvailable(newPosition.x, newPosition.y)) {
-            this.bouncePlayer(player, direction);
-            return;
-        }
-        
         try {
             this.isTransitioning = true;
-            player.setImmovable(true);
+            const gameScene = this.scene as GameScene;
+            gameScene.startMapTransition();
             
-            const newPlayerPosition = { x: player.x, y: player.y };
+            const newPosition = this.calculateNewPosition(direction);
+            const newMapKey = this.getMapKey(newPosition.x, newPosition.y);
             
-            // Set player position on new map, ensuring we're past the transition threshold
-            switch (direction) {
-                case "north":
-                    newPlayerPosition.y = mapHeight - (this.tileSize * 2);
-                    newPlayerPosition.x = player.x; // Maintain X position
-                    break;
-                case "south":
-                    newPlayerPosition.y = this.tileSize;
-                    newPlayerPosition.x = player.x; // Maintain X position
-                    break;
-                case "east":
-                    newPlayerPosition.x = this.tileSize;
-                    newPlayerPosition.y = player.y; // Maintain Y position
-                    break;
-                case "west":
-                    newPlayerPosition.x = mapWidth - (this.tileSize + this.transitionThreshold);
-                    newPlayerPosition.y = player.y; // Maintain Y position
-                    break;
+            if (!MapManager.AVAILABLE_MAPS.has(newMapKey)) {
+                this.bouncePlayer(player, direction);
+                return;
             }
 
-            // Store the final position before loading
-            const finalPosition = { ...newPlayerPosition };
-
-            // Load the new map
-            await this.loadMap(newPosition.x, newPosition.y);
+            // Load new map assets before destroying current
+            await this.loadMapAssets(newMapKey);
+            
+            // Calculate new player position before destroying current map
+            const newPlayerPos = this.calculatePlayerTransitionPosition(
+                player,
+                direction
+            );
+            
+            // Clear old map
+            this.destroyCurrentMap();
+            
+            // Update position and create new map
+            this.currentPosition = newPosition;
+            await this.createMap();
             
             // Update player position
-            player.setPosition(finalPosition.x, finalPosition.y);
+            player.setPosition(newPlayerPos.x, newPlayerPos.y);
+            
+            // Preload adjacent maps
+            await this.preloadAdjacentMaps();
             
         } catch (error) {
             console.error('Map transition failed:', error);
+            this.bouncePlayer(player, direction);
         } finally {
-            player.setImmovable(false);
+            const gameScene = this.scene as GameScene;
+            gameScene.endMapTransition();
             this.isTransitioning = false;
         }
     }
@@ -288,5 +274,80 @@ export class MapManager {
             key: this.getMapKey(this.currentPosition.x, this.currentPosition.y),
             data: this.currentMap,
         };
+    }
+
+    private async preloadAdjacentMaps(): Promise<void> {
+        const adjacentMaps = this.getAdjacentMaps();
+        const preloadPromises: Promise<void>[] = [];
+
+        // Helper function to preload a single map
+        const preloadMap = async (coord: MapCoordinate | null) => {
+            if (coord && !this.isMapLoaded(coord.x, coord.y)) {
+                const mapKey = this.getMapKey(coord.x, coord.y);
+                try {
+                    await new Promise<void>((resolve, reject) => {
+                        this.scene.load.json(mapKey, `/assets/maps/${mapKey}.json`);
+                        this.scene.load.tilemapTiledJSON(mapKey, `/assets/maps/${mapKey}.json`);
+                        
+                        this.scene.load.once("complete", () => resolve());
+                        this.scene.load.once("loaderror", reject);
+                        this.scene.load.start();
+                    });
+                    this.loadedMaps.add(mapKey);
+                } catch (error) {
+                    console.error(`Failed to preload map ${mapKey}:`, error);
+                }
+            }
+        };
+
+        // Preload all adjacent maps
+        if (adjacentMaps.north) preloadPromises.push(preloadMap(adjacentMaps.north));
+        if (adjacentMaps.south) preloadPromises.push(preloadMap(adjacentMaps.south));
+        if (adjacentMaps.east) preloadPromises.push(preloadMap(adjacentMaps.east));
+        if (adjacentMaps.west) preloadPromises.push(preloadMap(adjacentMaps.west));
+
+        await Promise.all(preloadPromises);
+    }
+
+    private calculateNewPosition(direction: string): MapCoordinate {
+        const newPosition = { ...this.currentPosition };
+        
+        switch (direction) {
+            case "north":
+                newPosition.y--;
+                break;
+            case "south":
+                newPosition.y++;
+                break;
+            case "east":
+                newPosition.x++;
+                break;
+            case "west":
+                newPosition.x--;
+                break;
+        }
+
+        return newPosition;
+    }
+
+    private calculatePlayerTransitionPosition(
+        player: Phaser.Physics.Arcade.Sprite,
+        direction: string
+    ): { x: number; y: number } {
+        const mapWidth = this.mapDimensions.width * this.tileSize;
+        const mapHeight = this.mapDimensions.height * this.tileSize;
+        
+        switch (direction) {
+            case "north":
+                return { x: player.x, y: mapHeight - (this.tileSize * 2) };
+            case "south":
+                return { x: player.x, y: this.tileSize * 2 };
+            case "east":
+                return { x: this.tileSize * 2, y: player.y };
+            case "west":
+                return { x: mapWidth - (this.tileSize * 2), y: player.y };
+            default:
+                return { x: player.x, y: player.y };
+        }
     }
 }

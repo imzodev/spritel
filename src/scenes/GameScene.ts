@@ -11,6 +11,7 @@ export default class GameScene extends Phaser.Scene {
     private playerCollider: Phaser.Physics.Arcade.Collider | null = null;
     private virtualDirection: string | null = null;
     private virtualAttackTriggered: boolean = false;
+    private isTransitioning: boolean = false;
 
     constructor() {
         super({ key: "GameScene" });
@@ -102,16 +103,36 @@ export default class GameScene extends Phaser.Scene {
         this.cameras.main.setZoom(2.0);
     }
 
-    public setCollisionLayer(newLayer: Phaser.Tilemaps.TilemapLayer): void {
+    public setCollisionLayer(newLayer: Phaser.Tilemaps.TilemapLayer | null): void {
+        // First, clean up existing collision
         this.destroyCurrentLayers();
 
-        if (this.player) {
+        // If we're just clearing the collision (newLayer is null), return early
+        if (!newLayer) {
+            this.collisionLayer = null;
+            return;
+        }
+
+        // Validate the new layer
+        if (!newLayer.tilemap) {
+            console.error('Invalid collision layer provided - no tilemap');
+            return;
+        }
+
+        try {
             newLayer.setCollisionByExclusion([-1, 0]);
-            this.playerCollider = this.physics.add.collider(
-                this.player.getSprite(),
-                newLayer
-            );
             this.collisionLayer = newLayer;
+            
+            if (this.player && !this.isTransitioning) {
+                this.playerCollider = this.physics.add.collider(
+                    this.player.getSprite(),
+                    newLayer
+                );
+            }
+        } catch (error) {
+            console.error('Failed to set up collision:', error);
+            this.collisionLayer = null;
+            this.playerCollider = null;
         }
     }
 
@@ -120,6 +141,7 @@ export default class GameScene extends Phaser.Scene {
             this.physics.world.removeCollider(this.playerCollider);
             this.playerCollider = null;
         }
+        this.collisionLayer = null;
     }
 
     public setVirtualControlDirection(direction: string | null): void {
@@ -130,8 +152,24 @@ export default class GameScene extends Phaser.Scene {
         this.virtualAttackTriggered = true;
     }
 
+    public startMapTransition(): void {
+        this.isTransitioning = true;
+        this.destroyCurrentLayers();
+    }
+
+    public endMapTransition(): void {
+        this.isTransitioning = false;
+        // Recreate collider if we have both player and collision layer
+        if (this.player && this.collisionLayer) {
+            this.playerCollider = this.physics.add.collider(
+                this.player.getSprite(),
+                this.collisionLayer
+            );
+        }
+    }
+
     update(time: number, delta: number): void {
-        if (!this.player || !this.cursors) return;
+        if (!this.player || !this.cursors || this.isTransitioning) return;
 
         const movement = this.getMovementInput();
         const isAttacking =
@@ -139,7 +177,11 @@ export default class GameScene extends Phaser.Scene {
             this.virtualAttackTriggered;
 
         this.player.update(movement, isAttacking);
-        this.mapManager.checkMapTransition(this.player.getSprite());
+        
+        // Only check for transitions if we're not already transitioning
+        if (!this.isTransitioning) {
+            this.mapManager.checkMapTransition(this.player.getSprite());
+        }
 
         this.virtualAttackTriggered = false;
     }
