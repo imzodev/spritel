@@ -164,7 +164,9 @@ export class MapManager {
 
         const mapWidth = this.mapDimensions.width * this.tileSize;
         const mapHeight = this.mapDimensions.height * this.tileSize;
+        // console.log("Player position:", player.x, player.y, " Map Height: ", mapHeight);
 
+        
         if (player.x <= this.transitionThreshold) {
             this.handleTransition("west", player);
         } else if (player.x >= mapWidth - this.transitionThreshold) {
@@ -183,6 +185,8 @@ export class MapManager {
         if (this.isTransitioning) return;
         
         const newPosition = { ...this.currentPosition };
+        const mapWidth = this.mapDimensions.width * this.tileSize;
+        const mapHeight = this.mapDimensions.height * this.tileSize;
         
         // Calculate new position first
         switch (direction) {
@@ -202,7 +206,6 @@ export class MapManager {
 
         // Check if the target map exists before proceeding
         if (!this.isMapAvailable(newPosition.x, newPosition.y)) {
-            // Prevent player from moving further in that direction
             this.bouncePlayer(player, direction);
             return;
         }
@@ -212,20 +215,24 @@ export class MapManager {
             player.setImmovable(true);
             
             const newPlayerPosition = { x: player.x, y: player.y };
-
-            // Set player position on new map
+            
+            // Set player position on new map, ensuring we're past the transition threshold
             switch (direction) {
                 case "north":
-                    newPlayerPosition.y = (this.mapDimensions.height - 1) * this.tileSize;
+                    newPlayerPosition.y = mapHeight - (this.tileSize * 2);
+                    newPlayerPosition.x = player.x; // Maintain X position
                     break;
                 case "south":
                     newPlayerPosition.y = this.tileSize;
+                    newPlayerPosition.x = player.x; // Maintain X position
                     break;
                 case "east":
                     newPlayerPosition.x = this.tileSize;
+                    newPlayerPosition.y = player.y; // Maintain Y position
                     break;
                 case "west":
-                    newPlayerPosition.x = (this.mapDimensions.width - 1) * this.tileSize;
+                    newPlayerPosition.x = mapWidth - (this.tileSize + this.transitionThreshold);
+                    newPlayerPosition.y = player.y; // Maintain Y position
                     break;
             }
 

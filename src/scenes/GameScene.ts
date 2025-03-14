@@ -71,8 +71,8 @@ export default class GameScene extends Phaser.Scene {
         const playerConfig = {
             speed: 160,
             scale: 0.5,
-            bodySize: { width: 20, height: 28 },
-            bodyOffset: { x: 22, y: 36 },
+            bodySize: { width: 20, height: 20 },
+            bodyOffset: { x: 22, y: 42 },
         };
 
         const animConfig = {
