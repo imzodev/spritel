@@ -208,11 +208,13 @@ export class Player {
         return this.currentAnimation;
     }
 
-    public getMapPosition(): { x: number, y: number } {
+    public getMapPosition(): { x: number; y: number } {
+        console.log('[Player] Getting map position:', this.mapPosition);
         return this.mapPosition;
     }
 
     public setMapPosition(x: number, y: number): void {
+        console.log('[Player] Setting map position:', { x, y, currentPos: this.mapPosition });
         this.mapPosition = { x, y };
     }
 }

@@ -179,19 +179,74 @@ export default class GameScene extends Phaser.Scene {
                 this.collisionLayer
             );
         }
+        // Send updated position to network after transition
+        this.networkManager.updatePlayerState(this.player);
+    }
+
+    public getOtherPlayersData(): Array<{id: string, x: number, y: number, animation: string}> {
+        const data: Array<{id: string, x: number, y: number, animation: string}> = [];
+        this.otherPlayers.forEach((sprite, id) => {
+            data.push({
+                id,
+                x: sprite.x,
+                y: sprite.y,
+                animation: sprite.anims.currentAnim?.key || 'idle-down'
+            });
+        });
+        return data;
+    }
+
+    public restoreOtherPlayers(
+        playersData: Array<{id: string, x: number, y: number, animation: string}>,
+        transitionDirection: string
+    ): void {
+        // Clear existing sprites first
+        this.otherPlayers.forEach(sprite => sprite.destroy());
+        this.otherPlayers.clear();
+
+        const mapWidth = this.mapManager.getMapWidth();
+        const mapHeight = this.mapManager.getMapHeight();
+
+        playersData.forEach(playerData => {
+            let newX = playerData.x;
+            let newY = playerData.y;
+
+            // Adjust positions based on transition direction
+            switch (transitionDirection) {
+                case 'east':
+                    newX = playerData.x - mapWidth;
+                    break;
+                case 'west':
+                    newX = playerData.x + mapWidth;
+                    break;
+                case 'south':
+                    newY = playerData.y - mapHeight;
+                    break;
+                case 'north':
+                    newY = playerData.y + mapHeight;
+                    break;
+            }
+
+            const sprite = this.add.sprite(newX, newY, 'player');
+            sprite.setScale(0.5);
+            this.ensureAnimationsExist();
+            sprite.play(playerData.animation);
+            sprite.setDepth(20); // Same depth as main player
+            this.otherPlayers.set(playerData.id, sprite);
+        });
     }
 
     private setupNetworkHandlers(): void {
         this.networkManager.on('game-state', (data) => {
+            console.log('Received game-state:', data);
             // First game state received - set our player's ID but keep our position
             if (!this.player.getId() && data.players.length > 0) {
                 const myPlayer = data.players[data.players.length - 1];
                 this.player.setId(myPlayer.id);
-                // Send a single update after getting ID
                 this.networkManager.updatePlayerState(this.player);
             }
 
-            // Only process other players
+            // Process all players - let handlePlayerUpdate handle map filtering
             data.players.forEach((playerData: any) => {
                 if (playerData.id && playerData.id !== this.player.getId()) {
                     this.handlePlayerUpdate(playerData, 'game-state');
@@ -199,35 +254,106 @@ export default class GameScene extends Phaser.Scene {
             });
         });
 
-        this.networkManager.on('player-joined', (data) => {
-            if (data.player.id && data.player.id !== this.player.getId()) {
-                this.handlePlayerUpdate(data.player, 'player-joined');
-            }
-        });
-
         this.networkManager.on('player-update', (data) => {
-            if (!data.player.id || data.player.id === this.player.getId()) return;
-            this.handlePlayerUpdate(data.player, 'player-update');
-        });
-
-        this.networkManager.on('player-left', (data) => {
-            console.log('💨 Player Left Event:', {
-                playerId: data.playerId,
-                totalPlayers: this.otherPlayers.size
+            console.log('[NetworkHandler] Received player-update:', {
+                playerId: data.player.id,
+                mapPosition: data.player.mapPosition,
+                currentPlayerId: this.player.getId()
             });
+            
+            if (!data.player.id || data.player.id === this.player.getId()) {
+                console.log('[NetworkHandler] Ignoring update for self');
+                return;
+            }
+            
+            // Only handle updates for players in our current map
+            const currentMapData = this.mapManager.getCurrentMap();
+            if (!currentMapData) return;
 
-            const sprite = this.otherPlayers.get(data.playerId);
-            if (sprite) {
-                sprite.destroy();
-                this.otherPlayers.delete(data.playerId);
+            const [_, currentX, currentY] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
+            const currentMap = { 
+                x: parseInt(currentX), 
+                y: parseInt(currentY) 
+            };
+
+            if (data.player.mapPosition.x === currentMap.x && 
+                data.player.mapPosition.y === currentMap.y) {
+                this.handlePlayerUpdate(data.player, 'player-update');
             }
         });
+
+        this.networkManager.on('player-map-changed', (data) => {
+            console.log('Received player-map-changed:', data);
+            if (data.player) {
+                this.handlePlayerUpdate(data.player, 'player-map-changed');
+            }
+        });
+
+        this.networkManager.on('player-left-map', (data) => {
+            console.log('[NetworkHandler] Received player-left-map:', {
+                playerId: data.playerId,
+                mapPosition: data.mapPosition
+            });
+            
+            const existingSprite = this.otherPlayers.get(data.playerId);
+            if (existingSprite) {
+                existingSprite.destroy();
+                this.otherPlayers.delete(data.playerId);
+                console.log('[NetworkHandler] Removed sprite for player:', data.playerId);
+            }
+        });
+    }
+
+    public getPlayer(): Player {
+        return this.player;
+    }
+
+    public getNetworkManager(): NetworkManager {
+        return this.networkManager;
     }
 
     private handlePlayerUpdate(playerData: any, source: string): void {
         // Guard against invalid player data
         if (!playerData.id) {
-            console.warn('Received player update with empty ID, ignoring');
+            console.warn('[HandlePlayerUpdate] Received player update with empty ID, ignoring');
+            return;
+        }
+
+        // Get current map position
+        const currentMapData = this.mapManager.getCurrentMap();
+        if (!currentMapData) {
+            console.warn('[HandlePlayerUpdate] No current map data available');
+            return;
+        }
+
+        // Extract current map coordinates
+        const [_, currentX, currentY] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
+        const currentMap = { 
+            x: parseInt(currentX), 
+            y: parseInt(currentY) 
+        };
+        
+        console.log('[HandlePlayerUpdate] Processing update:', {
+            playerId: playerData.id,
+            playerMapPos: playerData.mapPosition,
+            currentMap: currentMap,
+            action: source
+        });
+
+        // If player is in a different map, remove their sprite
+        if (!playerData.mapPosition || 
+            playerData.mapPosition.x !== currentMap.x || 
+            playerData.mapPosition.y !== currentMap.y) {
+            console.log('[HandlePlayerUpdate] Removing player from different map:', {
+                playerId: playerData.id,
+                playerMap: playerData.mapPosition,
+                currentMap: currentMap
+            });
+            const existingSprite = this.otherPlayers.get(playerData.id);
+            if (existingSprite) {
+                existingSprite.destroy();
+                this.otherPlayers.delete(playerData.id);
+            }
             return;
         }
 
@@ -246,11 +372,13 @@ export default class GameScene extends Phaser.Scene {
                 existingSprite.play(normalizedData.animation, true);
             }
         } else {
+            console.log('Creating new sprite for player:', normalizedData.id);
             const sprite = this.add.sprite(normalizedData.x, normalizedData.y, 'player');
             sprite.setScale(0.5);
             this.ensureAnimationsExist();
             this.otherPlayers.set(normalizedData.id, sprite);
             sprite.play(normalizedData.animation);
+            sprite.setDepth(20);
         }
     }
 
@@ -374,5 +502,13 @@ export default class GameScene extends Phaser.Scene {
         }
 
         return { x, y };
+    }
+
+    private isSameMap(otherMapPosition: { x: number, y: number }): boolean {
+        const currentMapData = this.mapManager.getCurrentMap();
+        if (!currentMapData) return false;
+        
+        const [_, x, y] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
+        return parseInt(x) === otherMapPosition.x && parseInt(y) === otherMapPosition.y;
     }
 }

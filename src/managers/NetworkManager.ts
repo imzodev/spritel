@@ -51,6 +51,17 @@ export class NetworkManager extends EventTarget {
   public updatePlayerState(player: Player) {
     if (this.ws.readyState === WebSocket.OPEN) {
       const currentAnimation = player.getCurrentAnimation();
+      const mapPosition = player.getMapPosition();
+      
+      console.log('[NetworkManager] Sending player update:', {
+        id: player.getId(),
+        mapPosition: mapPosition,
+        position: {
+          x: player.getSprite().x,
+          y: player.getSprite().y
+        }
+      });
+      
       this.ws.send(JSON.stringify({
         type: 'player-update',
         player: {
@@ -58,7 +69,7 @@ export class NetworkManager extends EventTarget {
           x: player.getSprite().x,
           y: player.getSprite().y,
           animation: currentAnimation,
-          mapPosition: player.getMapPosition(),
+          mapPosition: mapPosition,
         },
       }));
     }

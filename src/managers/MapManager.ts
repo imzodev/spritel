@@ -217,18 +217,27 @@ export class MapManager {
         try {
             this.isTransitioning = true;
             const gameScene = this.scene as GameScene;
-            gameScene.startMapTransition();
             
             const newPosition = this.calculateNewPosition(direction);
             const newMapKey = this.getMapKey(newPosition.x, newPosition.y);
             
+            console.log('[MapManager] Starting map transition:', {
+                direction,
+                from: this.currentPosition,
+                to: newPosition,
+                newMapKey
+            });
+
             if (!MapManager.AVAILABLE_MAPS.has(newMapKey)) {
+                console.log('[MapManager] Map not available:', newMapKey);
                 this.bouncePlayer(player, direction);
                 return;
             }
 
-            // Load new map assets before destroying current
-            await this.loadMapAssets(newMapKey);
+            // Store other players' positions before transition
+            const playersData = gameScene.getOtherPlayersData();
+            
+            gameScene.startMapTransition();
             
             // Calculate new player position before destroying current map
             const newPlayerPos = this.calculatePlayerTransitionPosition(
@@ -241,16 +250,25 @@ export class MapManager {
             
             // Update position and create new map
             this.currentPosition = newPosition;
+            
+            // Update the player's map position BEFORE creating the new map
+            const playerEntity = gameScene.getPlayer();
+            if (playerEntity) {
+                playerEntity.setMapPosition(newPosition.x, newPosition.y);
+                // Immediately notify network of map position change
+                gameScene.getNetworkManager().updatePlayerState(playerEntity);
+            }
+            
             await this.createMap();
             
             // Update player position
             player.setPosition(newPlayerPos.x, newPlayerPos.y);
             
-            // Preload adjacent maps
-            await this.preloadAdjacentMaps();
+            // Restore other players in their relative positions
+            gameScene.restoreOtherPlayers(playersData, direction);
             
         } catch (error) {
-            console.error('Map transition failed:', error);
+            console.error('[MapManager] Map transition failed:', error);
             this.bouncePlayer(player, direction);
         } finally {
             const gameScene = this.scene as GameScene;
@@ -369,5 +387,17 @@ export class MapManager {
             default:
                 return { x: player.x, y: player.y };
         }
+    }
+
+    public getMapWidth(): number {
+        return this.mapDimensions.width * this.tileSize;
+    }
+
+    public getMapHeight(): number {
+        return this.mapDimensions.height * this.tileSize;
+    }
+
+    public getCurrentPosition(): MapCoordinate {
+        return this.currentPosition;
     }
 }

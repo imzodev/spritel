@@ -78,10 +78,46 @@ const server = Bun.serve<{ id: string }>({
         case "player-update":
           const player = state.players.get(playerId);
           if (player) {
+            const oldMapPosition = { ...player.mapPosition };
+            
             // Update player state
             Object.assign(player, data.player);
-            // Broadcast update to other players
-            broadcast({ type: "player-update", player }, ws);
+            
+            console.log('[Server] Processing player update:', {
+              playerId,
+              oldMap: oldMapPosition,
+              newMap: player.mapPosition
+            });
+            
+            // If map position changed, notify everyone about the transition
+            if (oldMapPosition.x !== player.mapPosition.x || 
+                oldMapPosition.y !== player.mapPosition.y) {
+              
+              console.log('[Server] Player changed maps:', {
+                playerId,
+                from: oldMapPosition,
+                to: player.mapPosition
+              });
+              
+              // First notify players in the old map that this player left
+              broadcast({ 
+                type: "player-left-map",
+                playerId,
+                mapPosition: oldMapPosition
+              }, ws, oldMapPosition);
+
+              // Then notify players in the new map about the player
+              broadcast({ 
+                type: "player-update", 
+                player 
+              }, ws, player.mapPosition);
+            } else {
+              // Regular update to players in the same map
+              broadcast({ 
+                type: "player-update", 
+                player 
+              }, ws, player.mapPosition);
+            }
           }
           break;
         case "player-attack":
@@ -109,10 +145,27 @@ const server = Bun.serve<{ id: string }>({
   },
 });
 
-function broadcast(message: any, sender?: { data: { id: string } }) {
+function broadcast(
+  message: any, 
+  sender?: { data: { id: string } },
+  mapPosition?: { x: number, y: number }
+) {
   const messageStr = JSON.stringify(message);
   for (const client of connectedClients) {
+    // Skip sender
     if (sender && client.data.id === sender.data.id) continue;
+    
+    // If mapPosition specified, only send to players on that map
+    if (mapPosition) {
+      const playerState = state.players.get(client.data.id);
+      if (!playerState) continue;
+      
+      if (playerState.mapPosition.x !== mapPosition.x || 
+          playerState.mapPosition.y !== mapPosition.y) {
+        continue;
+      }
+    }
+    
     client.send(messageStr);
   }
 }
