@@ -127,8 +127,8 @@
             "width": 24,
             "height": 15,
             "type": "tilelayer",
-            "visible": true,
-            "opacity": 0.5,
+            "visible": false,
+            "opacity": 0,
             "properties": {
                 "collides": true
             },
