@@ -11,6 +11,7 @@ export class Player {
     private id: string | null = null;  // Start with null ID
     private currentAnimation: string = 'idle-down';
     private mapPosition: { x: number, y: number } = { x: 0, y: 0 };
+    private inventory: any[] = []; // Add inventory array
 
     constructor(
         scene: Phaser.Scene,
@@ -216,5 +217,44 @@ export class Player {
     public setMapPosition(x: number, y: number): void {
         console.log('[Player] Setting map position:', { x, y, currentPos: this.mapPosition });
         this.mapPosition = { x, y };
+    }
+
+    public isColliding(entity: { getBounds: () => any }): boolean {
+        const playerBounds = this.sprite.getBounds();
+        const entityBounds = entity.getBounds();
+        
+        return Phaser.Geom.Rectangle.Overlaps(playerBounds, entityBounds);
+    }
+
+    public applyKnockback(direction: { x: number, y: number }, force: number): void {
+        this.sprite.setVelocity(direction.x * force, direction.y * force);
+    }
+
+    public interact(item: any): void {
+        this.inventory.push(item);
+    }
+
+    public getInventory(): any[] {
+        return this.inventory;
+    }
+
+    public serialize(): any {
+        return {
+            id: this.getId(),
+            x: this.sprite.x,
+            y: this.sprite.y,
+            direction: this.lastDirection,
+            isAttacking: this.isAttacking
+        };
+    }
+
+    public updateFromNetwork(state: any): void {
+        this.sprite.setPosition(state.x, state.y);
+        this.lastDirection = state.direction;
+        
+        if (state.isAttacking) {
+            const attackAnim = `attack-${state.direction}`;
+            this.sprite.anims.play(attackAnim, true);
+        }
     }
 }

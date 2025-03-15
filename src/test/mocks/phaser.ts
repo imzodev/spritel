@@ -21,6 +21,11 @@ vi.mock('phaser', () => ({
     },
     Physics: {
       ARCADE: 'ARCADE'
+    },
+    Geom: {
+      Rectangle: {
+        Overlaps: vi.fn().mockReturnValue(true)
+      }
     }
   }
 }))
