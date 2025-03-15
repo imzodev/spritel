@@ -71,7 +71,10 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onDirectionPress, onAtt
       {/* Attack Button */}
       <button
         className="w-16 h-16 bg-red-600/70 rounded-full flex items-center justify-center text-white select-none touch-manipulation z-30"
-        onPointerDown={onAttackPress}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          onAttackPress();
+        }}
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />

@@ -12,6 +12,7 @@ export default class GameScene extends Phaser.Scene {
     private virtualDirection: string | null = null;
     private virtualAttackTriggered: boolean = false;
     private isTransitioning: boolean = false;
+    private isAttacking: boolean = false;
 
     constructor() {
         super({ key: "GameScene" });
@@ -103,7 +104,9 @@ export default class GameScene extends Phaser.Scene {
         this.cameras.main.setZoom(2.0);
     }
 
-    public setCollisionLayer(newLayer: Phaser.Tilemaps.TilemapLayer | null): void {
+    public setCollisionLayer(
+        newLayer: Phaser.Tilemaps.TilemapLayer | null
+    ): void {
         // First, clean up existing collision
         this.destroyCurrentLayers();
 
@@ -115,14 +118,14 @@ export default class GameScene extends Phaser.Scene {
 
         // Validate the new layer
         if (!newLayer.tilemap) {
-            console.error('Invalid collision layer provided - no tilemap');
+            console.error("Invalid collision layer provided - no tilemap");
             return;
         }
 
         try {
             newLayer.setCollisionByExclusion([-1, 0]);
             this.collisionLayer = newLayer;
-            
+
             if (this.player && !this.isTransitioning) {
                 this.playerCollider = this.physics.add.collider(
                     this.player.getSprite(),
@@ -130,7 +133,7 @@ export default class GameScene extends Phaser.Scene {
                 );
             }
         } catch (error) {
-            console.error('Failed to set up collision:', error);
+            console.error("Failed to set up collision:", error);
             this.collisionLayer = null;
             this.playerCollider = null;
         }
@@ -172,24 +175,37 @@ export default class GameScene extends Phaser.Scene {
         if (!this.player || !this.cursors || this.isTransitioning) return;
 
         const movement = this.getMovementInput();
-        const isAttacking =
-            Phaser.Input.Keyboard.JustDown(this.attackKey) ||
-            this.virtualAttackTriggered;
 
-        this.player.update(movement, isAttacking);
-        
-        // Only check for transitions if we're not already transitioning
+        // Simplified attack detection
+        const isAttackTriggered =
+            this.attackKey.isDown || this.virtualAttackTriggered;
+
+        if (isAttackTriggered) {
+            this.isAttacking = true;
+        }
+
+        this.player.update(movement, this.isAttacking);
+
+        // Reset attack state after update
+        this.isAttacking = false;
+        this.virtualAttackTriggered = false;
+
         if (!this.isTransitioning) {
             this.mapManager.checkMapTransition(this.player.getSprite());
         }
-
-        this.virtualAttackTriggered = false;
     }
 
     private getMovementInput(): { x: number; y: number } {
         let x = 0;
         let y = 0;
 
+        // Handle keyboard input
+        if (this.cursors.left.isDown) x = -1;
+        else if (this.cursors.right.isDown) x = 1;
+        if (this.cursors.up.isDown) y = -1;
+        else if (this.cursors.down.isDown) y = 1;
+
+        // Handle virtual input (mobile)
         if (this.virtualDirection) {
             switch (this.virtualDirection) {
                 case "up":
@@ -205,11 +221,6 @@ export default class GameScene extends Phaser.Scene {
                     x = 1;
                     break;
             }
-        } else {
-            if (this.cursors.left.isDown) x = -1;
-            else if (this.cursors.right.isDown) x = 1;
-            if (this.cursors.up.isDown) y = -1;
-            else if (this.cursors.down.isDown) y = 1;
         }
 
         return { x, y };

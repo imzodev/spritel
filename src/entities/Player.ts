@@ -105,16 +105,23 @@ export class Player {
         movement: { x: number; y: number },
         isAttacking: boolean
     ): void {
+        // Handle attack first
         if (isAttacking) {
             this.attack();
             return;
         }
 
+        // Only move if not attacking
         this.move(movement);
     }
 
     private move(movement: { x: number; y: number }): void {
         const { x, y } = movement;
+
+        // Only move if we're not in an attack animation
+        if (this.sprite.anims.currentAnim?.key.startsWith("attack-")) {
+            return;
+        }
 
         // Normalize diagonal movement
         if (x !== 0 && y !== 0) {
@@ -147,12 +154,16 @@ export class Player {
 
     private attack(): void {
         const attackAnim = `attack-${this.lastDirection}`;
-        if (
-            !this.sprite.anims.isPlaying ||
-            !this.sprite.anims.currentAnim?.key.startsWith("attack-")
-        ) {
-            this.sprite.anims.play(attackAnim, true);
-        }
+        
+        // Always play the attack animation when requested
+        this.sprite.anims.stop();
+        this.sprite.anims.play(attackAnim, true);
+        this.sprite.setVelocity(0, 0);
+        
+        // Return to idle when animation completes
+        this.sprite.once('animationcomplete', () => {
+            this.playIdle();
+        });
     }
 
     private playIdle(): void {
