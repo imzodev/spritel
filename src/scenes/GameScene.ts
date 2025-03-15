@@ -213,7 +213,7 @@ export default class GameScene extends Phaser.Scene {
         this.networkManager.on('player-left', (data) => {
             console.log('💨 Player Left Event:', {
                 playerId: data.playerId,
-                existingPlayers: Array.from(this.otherPlayers.keys())
+                totalPlayers: this.otherPlayers.size
             });
 
             const sprite = this.otherPlayers.get(data.playerId);
