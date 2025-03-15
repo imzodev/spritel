@@ -16,6 +16,7 @@ export default class GameScene extends Phaser.Scene {
     private isAttacking: boolean = false;
     private networkManager!: NetworkManager;
     private otherPlayers: Map<string, Phaser.GameObjects.Sprite> = new Map();
+    private initialized: boolean = false;
 
     constructor() {
         super({ key: "GameScene" });
@@ -55,6 +56,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     create(): void {
+        if (this.initialized) return;
+        this.initialized = true;
+
         this.initializeControls();
         this.createPlayer();
         this.setupCamera();
@@ -101,6 +105,7 @@ export default class GameScene extends Phaser.Scene {
             },
         };
 
+        // Create player at default position
         this.player = new Player(this, 100, 100, playerConfig, animConfig);
     }
 
@@ -179,30 +184,50 @@ export default class GameScene extends Phaser.Scene {
     private setupNetworkHandlers(): void {
         this.networkManager.on('connect', () => {
             console.log('🎮 Connected to game server');
+            // Send initial position to server right after connection
             this.networkManager.updatePlayerState(this.player);
         });
 
         this.networkManager.on('game-state', (data) => {
-            console.log('📥 Received game state:', {
-                myId: this.player.getId(),
-                allPlayers: data.players.map((p: any) => p.id)
-            });
+            console.log('📥 Received game state:', data.players);
+            
+            // First game state received - set our player's ID but keep our position
+            if (!this.player.getId() && data.players.length > 0) {
+                // Find our player in the received data (it will be the last one added)
+                const myPlayer = data.players[data.players.length - 1];
+                this.player.setId(myPlayer.id);
+                
+                console.log('🎮 Set player ID:', {
+                    id: this.player.getId(),
+                    x: this.player.getSprite().x,
+                    y: this.player.getSprite().y
+                });
+                
+                // Send our current position to server
+                this.networkManager.updatePlayerState(this.player);
+            }
 
-            // Clear existing other players first
-            this.otherPlayers.forEach(sprite => sprite.destroy());
-            this.otherPlayers.clear();
-
-            // Only create sprites for other players, NOT yourself
+            // Update other players
             data.players.forEach((playerData: any) => {
                 if (playerData.id !== this.player.getId()) {
-                    console.log('➕ Creating other player:', playerData.id);
-                    this.createOtherPlayer(playerData);
+                    const existingSprite = this.otherPlayers.get(playerData.id);
+                    if (existingSprite) {
+                        // Update existing player position and animation
+                        existingSprite.setPosition(playerData.x, playerData.y);
+                        if (playerData.animation && existingSprite.anims.currentAnim?.key !== playerData.animation) {
+                            existingSprite.play(playerData.animation, true);
+                        }
+                    } else {
+                        // Create new player
+                        console.log('➕ Creating other player:', playerData.id, 'at position:', playerData.x, playerData.y);
+                        this.createOtherPlayer(playerData);
+                    }
                 }
             });
         });
 
         this.networkManager.on('player-joined', (data) => {
-            console.log('👋 Player joined:', data.player.id);
+            console.log('👋 Player joined:', data.player);
             // Only create other players, not yourself
             if (data.player.id !== this.player.getId()) {
                 this.createOtherPlayer(data.player);
@@ -224,21 +249,43 @@ export default class GameScene extends Phaser.Scene {
             
             const sprite = this.otherPlayers.get(data.player.id);
             if (sprite) {
+                // Update position
                 sprite.setPosition(data.player.x, data.player.y);
-                if (sprite.anims.currentAnim?.key !== data.player.animation) {
+                
+                // Update animation if it's different
+                if (data.player.animation && sprite.anims.currentAnim?.key !== data.player.animation) {
+                    console.log('🎬 Updating player animation:', data.player.id, data.player.animation);
                     sprite.play(data.player.animation, true);
                 }
+            } else {
+                console.log('➕ Late player creation:', data.player.id);
+                this.createOtherPlayer(data.player);
             }
         });
     }
 
     private createOtherPlayer(playerData: any): void {
-        if (this.otherPlayers.has(playerData.id)) return; // Don't create duplicates
+        if (this.otherPlayers.has(playerData.id)) {
+            console.log('⚠️ Player already exists:', playerData.id);
+            return;
+        }
+        
+        console.log('🎮 Creating other player:', {
+            id: playerData.id,
+            position: { x: playerData.x, y: playerData.y }
+        });
         
         const sprite = this.add.sprite(playerData.x, playerData.y, 'player');
         sprite.setScale(0.5);
         
-        // Create the same animations for other players
+        // Create animations if they don't exist yet
+        this.ensureAnimationsExist();
+        
+        this.otherPlayers.set(playerData.id, sprite);
+        sprite.play(playerData.animation || 'idle-down');
+    }
+
+    private ensureAnimationsExist(): void {
         const animConfig = {
             frameRate: 8,
             framesPerRow: 13,
@@ -258,33 +305,49 @@ export default class GameScene extends Phaser.Scene {
             },
         };
 
-        // Create animations for this sprite
         ["up", "left", "down", "right"].forEach((direction) => {
             // Idle animations
-            this.anims.create({
-                key: `idle-${direction}`,
-                frames: this.anims.generateFrameNumbers("player", {
-                    start: animConfig.rows[`idle${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow,
-                    end: animConfig.rows[`idle${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow + 1,
-                }),
-                frameRate: 1.5,
-                repeat: -1,
-            });
+            const idleKey = `idle-${direction}`;
+            if (!this.anims.exists(idleKey)) {
+                this.anims.create({
+                    key: idleKey,
+                    frames: this.anims.generateFrameNumbers("player", {
+                        start: animConfig.rows[`idle${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow,
+                        end: animConfig.rows[`idle${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow + 1,
+                    }),
+                    frameRate: 1.5,
+                    repeat: -1,
+                });
+            }
 
             // Walk animations
-            this.anims.create({
-                key: `walk-${direction}`,
-                frames: this.anims.generateFrameNumbers("player", {
-                    start: animConfig.rows[`walk${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow,
-                    end: animConfig.rows[`walk${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow + 8,
-                }),
-                frameRate: 8,
-                repeat: -1,
-            });
-        });
+            const walkKey = `walk-${direction}`;
+            if (!this.anims.exists(walkKey)) {
+                this.anims.create({
+                    key: walkKey,
+                    frames: this.anims.generateFrameNumbers("player", {
+                        start: animConfig.rows[`walk${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow,
+                        end: animConfig.rows[`walk${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow + 8,
+                    }),
+                    frameRate: 8,
+                    repeat: -1,
+                });
+            }
 
-        this.otherPlayers.set(playerData.id, sprite);
-        sprite.play(playerData.animation || 'idle-down');
+            // Attack animations
+            const attackKey = `attack-${direction}`;
+            if (!this.anims.exists(attackKey)) {
+                this.anims.create({
+                    key: attackKey,
+                    frames: this.anims.generateFrameNumbers("player", {
+                        start: animConfig.rows[`attack${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow,
+                        end: animConfig.rows[`attack${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow + 5,
+                    }),
+                    frameRate: 12,
+                    repeat: 0,
+                });
+            }
+        });
     }
 
     update(time: number, delta: number): void {
@@ -310,7 +373,7 @@ export default class GameScene extends Phaser.Scene {
             this.mapManager.checkMapTransition(this.player.getSprite());
         }
 
-        // Send player updates to server
+        // Send player updates to server more frequently
         this.networkManager.updatePlayerState(this.player);
     }
 

@@ -46,29 +46,29 @@ const server = Bun.serve<{ id: string }>({
       const id = ws.data.id;
       connectedClients.add(ws);
 
-      // Initialize player
+      // Initialize player with default position
       state.players.set(id, {
         id,
-        x: 100,
-        y: 100,
+        x: 100,  // Default position matching client
+        y: 100,  // Default position matching client
         animation: "idle-down",
         mapPosition: { x: 0, y: 0 },
       });
 
-      console.log(`\n👤 Player ${id} connected`);
+      console.log(`\n👤 Player ${id} connected at default position`);
       logGameState();
 
-      // Broadcast new player to others
-      broadcast({
-        type: "player-joined",
-        player: state.players.get(id),
-      }, ws);
-
-      // Send current state to new player
+      // First send current state to new player
       ws.send(JSON.stringify({
         type: "game-state",
         players: Array.from(state.players.values()),
       }));
+
+      // Then broadcast new player to others
+      broadcast({
+        type: "player-joined",
+        player: state.players.get(id),
+      }, ws);
     },
     message(ws, message) {
       const data = JSON.parse(String(message));
@@ -78,7 +78,9 @@ const server = Bun.serve<{ id: string }>({
         case "player-update":
           const player = state.players.get(playerId);
           if (player) {
+            // Update player state
             Object.assign(player, data.player);
+            // Broadcast update to other players
             broadcast({ type: "player-update", player }, ws);
           }
           break;

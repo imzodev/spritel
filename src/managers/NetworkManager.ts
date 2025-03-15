@@ -50,13 +50,14 @@ export class NetworkManager extends EventTarget {
 
   public updatePlayerState(player: Player) {
     if (this.ws.readyState === WebSocket.OPEN) {
+      const currentAnimation = player.getCurrentAnimation();
       this.ws.send(JSON.stringify({
         type: 'player-update',
         player: {
           id: player.getId(),
           x: player.getSprite().x,
           y: player.getSprite().y,
-          animation: player.getCurrentAnimation(),
+          animation: currentAnimation,
           mapPosition: player.getMapPosition(),
         },
       }));

@@ -8,7 +8,7 @@ export class Player {
     private lastDirection: string = "down";
     private scene: Phaser.Scene;
     private isAttacking: boolean = false; // Add this to track attack state
-    private id: string;
+    private id: string | null = null;  // Start with null ID
     private currentAnimation: string = 'idle-down';
     private mapPosition: { x: number, y: number } = { x: 0, y: 0 };
 
@@ -19,12 +19,19 @@ export class Player {
         config: PlayerConfig,
         animConfig: AnimationConfig
     ) {
-        this.id = crypto.randomUUID();
         this.scene = scene;
         this.config = config;
         this.animConfig = animConfig;
         this.sprite = this.createSprite(x, y);
         this.setupAnimations();
+    }
+
+    public setId(id: string) {
+        this.id = id;
+    }
+
+    public getId(): string {
+        return this.id || '';
     }
 
     private createSprite(x: number, y: number): Phaser.Physics.Arcade.Sprite {
@@ -195,10 +202,6 @@ export class Player {
 
     public setPosition(x: number, y: number): void {
         this.sprite.setPosition(x, y);
-    }
-
-    public getId(): string {
-        return this.id;
     }
 
     public getCurrentAnimation(): string {
