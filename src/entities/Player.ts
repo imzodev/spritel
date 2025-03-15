@@ -41,8 +41,8 @@ export class Player {
             );
         }
 
-        // Set a high depth to ensure player renders above all layers
-        sprite.setDepth(100);
+        // Set player depth between lower and upper decoration layers
+        sprite.setDepth(20);
         return sprite;
     }
 

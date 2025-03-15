@@ -148,13 +148,29 @@ export class MapManager {
         console.log('Creating map layers...');
         this.currentLayers = {
             ground: map.createLayer("Ground", tileset, 0, 0),
-            decoration: map.createLayer("Decoration", tileset, 0, 0),
+            decorationLower: map.createLayer("DecorationLower", tileset, 0, 0),
+            decorationUpper: map.createLayer("DecorationUpper", tileset, 0, 0),
             collision: map.createLayer("Collision", tileset, 0, 0)
         };
 
+        // Set proper depth for layers
+        if (this.currentLayers.ground) {
+            this.currentLayers.ground.setDepth(0);
+        }
+        if (this.currentLayers.decorationLower) {
+            this.currentLayers.decorationLower.setDepth(10);
+        }
+        if (this.currentLayers.decorationUpper) {
+            this.currentLayers.decorationUpper.setDepth(30);
+        }
+        if (this.currentLayers.collision) {
+            this.currentLayers.collision.setDepth(5);  // Keep collision layer below everything
+        }
+
         console.log('Layers created:', {
             ground: !!this.currentLayers.ground,
-            decoration: !!this.currentLayers.decoration,
+            decorationLower: !!this.currentLayers.decorationLower,
+            decorationUpper: !!this.currentLayers.decorationUpper,
             collision: !!this.currentLayers.collision
         });
 
