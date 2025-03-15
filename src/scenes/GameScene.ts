@@ -16,6 +16,7 @@ export default class GameScene extends Phaser.Scene {
     private isAttacking: boolean = false;
     private networkManager!: NetworkManager;
     private otherPlayers: Map<string, Phaser.GameObjects.Sprite> = new Map();
+    private otherPlayersPhysics: Map<string, Phaser.Physics.Arcade.Sprite> = new Map();
     private initialized: boolean = false;
 
     constructor() {
@@ -289,17 +290,35 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
-        this.networkManager.on('player-left-map', (data) => {
-            console.log('[NetworkHandler] Received player-left-map:', {
-                playerId: data.playerId,
-                mapPosition: data.mapPosition
+        this.networkManager.on('player-left', (data) => {
+            console.log('[NetworkHandler] Received player-left:', {
+                playerId: data.playerId
             });
             
             const existingSprite = this.otherPlayers.get(data.playerId);
+            const existingPhysicsSprite = this.otherPlayersPhysics.get(data.playerId);
+            
             if (existingSprite) {
                 existingSprite.destroy();
                 this.otherPlayers.delete(data.playerId);
-                console.log('[NetworkHandler] Removed sprite for player:', data.playerId);
+            }
+            if (existingPhysicsSprite) {
+                existingPhysicsSprite.destroy();
+                this.otherPlayersPhysics.delete(data.playerId);
+            }
+        });
+
+        this.networkManager.on('player-left-map', (data) => {
+            const existingSprite = this.otherPlayers.get(data.playerId);
+            const existingPhysicsSprite = this.otherPlayersPhysics.get(data.playerId);
+            
+            if (existingSprite) {
+                existingSprite.destroy();
+                this.otherPlayers.delete(data.playerId);
+            }
+            if (existingPhysicsSprite) {
+                existingPhysicsSprite.destroy();
+                this.otherPlayersPhysics.delete(data.playerId);
             }
         });
     }
@@ -350,9 +369,15 @@ export default class GameScene extends Phaser.Scene {
                 currentMap: currentMap
             });
             const existingSprite = this.otherPlayers.get(playerData.id);
+            const existingPhysicsSprite = this.otherPlayersPhysics.get(playerData.id);
+            
             if (existingSprite) {
                 existingSprite.destroy();
                 this.otherPlayers.delete(playerData.id);
+            }
+            if (existingPhysicsSprite) {
+                existingPhysicsSprite.destroy();
+                this.otherPlayersPhysics.delete(playerData.id);
             }
             return;
         }
@@ -365,20 +390,34 @@ export default class GameScene extends Phaser.Scene {
             animation: playerData.animation ?? 'idle-down'
         };
 
-        const existingSprite = this.otherPlayers.get(normalizedData.id);
-        if (existingSprite) {
+        let existingSprite = this.otherPlayers.get(normalizedData.id);
+        let existingPhysicsSprite = this.otherPlayersPhysics.get(normalizedData.id);
+
+        if (existingSprite && existingPhysicsSprite) {
             existingSprite.setPosition(normalizedData.x, normalizedData.y);
+            existingPhysicsSprite.setPosition(normalizedData.x, normalizedData.y);
             if (normalizedData.animation && existingSprite.anims.currentAnim?.key !== normalizedData.animation) {
                 existingSprite.play(normalizedData.animation, true);
             }
         } else {
-            console.log('Creating new sprite for player:', normalizedData.id);
+            // Create visible sprite
             const sprite = this.add.sprite(normalizedData.x, normalizedData.y, 'player');
             sprite.setScale(0.5);
             this.ensureAnimationsExist();
             this.otherPlayers.set(normalizedData.id, sprite);
             sprite.play(normalizedData.animation);
             sprite.setDepth(20);
+
+            // Create physics sprite (invisible)
+            const physicsSprite = this.physics.add.sprite(normalizedData.x, normalizedData.y, 'player');
+            physicsSprite.setVisible(false);
+            physicsSprite.setScale(0.5);
+            physicsSprite.setImmovable(true);
+            physicsSprite.body.setSize(32, 32); // Adjust collision box size as needed
+            this.otherPlayersPhysics.set(normalizedData.id, physicsSprite);
+
+            // Add collision with the main player
+            this.physics.add.collider(this.player.getSprite(), physicsSprite);
         }
     }
 
