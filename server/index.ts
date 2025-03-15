@@ -18,13 +18,26 @@ const state: GameState = {
 
 const connectedClients = new Set<any>();
 
+function logGameState() {
+  console.log('\n=== Current Game State ===');
+  console.log('Connected players:', state.players.size);
+  state.players.forEach((player, id) => {
+    console.log(`Player ${id}:`, {
+      position: { x: player.x, y: player.y },
+      animation: player.animation,
+      mapPosition: player.mapPosition
+    });
+  });
+  console.log('========================\n');
+}
+
 const server = Bun.serve<{ id: string }>({
   port: 3001,
   fetch(req, server) {
     if (server.upgrade(req, {
       data: { id: crypto.randomUUID() }
     })) {
-      return; // Return if upgrade was successful
+      return;
     }
     return new Response("Upgrade failed", { status: 500 });
   },
@@ -41,6 +54,9 @@ const server = Bun.serve<{ id: string }>({
         animation: "idle-down",
         mapPosition: { x: 0, y: 0 },
       });
+
+      console.log(`\n👤 Player ${id} connected`);
+      logGameState();
 
       // Broadcast new player to others
       broadcast({
@@ -79,6 +95,10 @@ const server = Bun.serve<{ id: string }>({
       const playerId = ws.data.id;
       state.players.delete(playerId);
       connectedClients.delete(ws);
+      
+      console.log(`\n👋 Player ${playerId} disconnected`);
+      logGameState();
+
       broadcast({
         type: "player-left",
         playerId,

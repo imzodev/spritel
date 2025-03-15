@@ -1,34 +1,51 @@
+
 import { Player } from "../entities/Player";
 
 type MessageHandler = (data: any) => void;
 
-export class NetworkManager {
+export class NetworkManager extends EventTarget {
   private ws: WebSocket;
-  private handlers: Map<string, MessageHandler[]> = new Map();
+  private handlers: Map<string, Set<MessageHandler>> = new Map();
 
   constructor() {
+    super();
     this.ws = new WebSocket('ws://localhost:3001');
-    this.setupWebSocket();
-  }
+    
+    this.ws.onopen = () => {
+      console.log('Connected to server');
+      this.dispatchEvent(new Event('connect'));
+    };
 
-  private setupWebSocket() {
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      const handlers = this.handlers.get(data.type) || [];
-      handlers.forEach(handler => handler(data));
+      this.dispatchEvent(new CustomEvent(data.type, { detail: data }));
     };
 
     this.ws.onclose = () => {
-      console.log('WebSocket connection closed');
-      // Implement reconnection logic here if needed
+      console.log('Disconnected from server');
+      this.dispatchEvent(new Event('disconnect'));
     };
   }
 
   public on(type: string, handler: MessageHandler) {
+    const wrappedHandler = (event: Event) => {
+      if (event instanceof CustomEvent) {
+        handler(event.detail);
+      } else {
+        handler({});
+      }
+    };
+
     if (!this.handlers.has(type)) {
-      this.handlers.set(type, []);
+      this.handlers.set(type, new Set());
     }
-    this.handlers.get(type)?.push(handler);
+    this.handlers.get(type)?.add(handler);
+    
+    this.addEventListener(type, wrappedHandler);
+  }
+
+  public off(type: string, handler: MessageHandler) {
+    this.handlers.get(type)?.delete(handler);
   }
 
   public updatePlayerState(player: Player) {

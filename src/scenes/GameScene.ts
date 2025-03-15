@@ -177,22 +177,40 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private setupNetworkHandlers(): void {
+        this.networkManager.on('connect', () => {
+            console.log('🎮 Connected to game server');
+            this.networkManager.updatePlayerState(this.player);
+        });
+
         this.networkManager.on('game-state', (data) => {
-            // Only create other players, not ourselves
+            console.log('📥 Received game state:', {
+                myId: this.player.getId(),
+                allPlayers: data.players.map((p: any) => p.id)
+            });
+
+            // Clear existing other players first
+            this.otherPlayers.forEach(sprite => sprite.destroy());
+            this.otherPlayers.clear();
+
+            // Only create sprites for other players, NOT yourself
             data.players.forEach((playerData: any) => {
                 if (playerData.id !== this.player.getId()) {
+                    console.log('➕ Creating other player:', playerData.id);
                     this.createOtherPlayer(playerData);
                 }
             });
         });
 
         this.networkManager.on('player-joined', (data) => {
+            console.log('👋 Player joined:', data.player.id);
+            // Only create other players, not yourself
             if (data.player.id !== this.player.getId()) {
                 this.createOtherPlayer(data.player);
             }
         });
 
         this.networkManager.on('player-left', (data) => {
+            console.log('💨 Player left:', data.playerId);
             const sprite = this.otherPlayers.get(data.playerId);
             if (sprite) {
                 sprite.destroy();
@@ -201,12 +219,12 @@ export default class GameScene extends Phaser.Scene {
         });
 
         this.networkManager.on('player-update', (data) => {
-            if (data.player.id === this.player.getId()) return; // Ignore our own updates
+            // Ignore updates about our own player
+            if (data.player.id === this.player.getId()) return;
             
             const sprite = this.otherPlayers.get(data.player.id);
             if (sprite) {
                 sprite.setPosition(data.player.x, data.player.y);
-                // Only change animation if it's different from current
                 if (sprite.anims.currentAnim?.key !== data.player.animation) {
                     sprite.play(data.player.animation, true);
                 }
