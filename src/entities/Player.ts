@@ -37,7 +37,7 @@ export class Player {
     private createSprite(x: number, y: number): Phaser.Physics.Arcade.Sprite {
         console.log("Creating player sprite at:", x, y);
         const sprite = this.scene.physics.add.sprite(x, y, "player");
-        console.log("Sprite created:", sprite);
+        
         sprite.setScale(this.config.scale);
         sprite.setCollideWorldBounds(true);
 
