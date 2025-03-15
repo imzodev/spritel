@@ -72,6 +72,7 @@ const Game = () => {
         <div className="relative w-full h-full">
             <div
                 id="game-container"
+                data-testid="game-container"
                 ref={gameContainerRef}
                 className="fixed inset-0 w-screen h-screen z-10"
             ></div>

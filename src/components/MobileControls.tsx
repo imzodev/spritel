@@ -7,13 +7,14 @@ interface MobileControlsProps {
 
 const MobileControls: React.FC<MobileControlsProps> = ({ onDirectionPress, onAttackPress }) => {
   return (
-    <div className="fixed bottom-6 left-0 right-0 p-4 flex justify-between items-center md:hidden pointer-events-auto z-30 select-none touch-manipulation">
+    <div data-testid="mobile-controls" className="fixed bottom-6 left-0 right-0 p-4 flex justify-between items-center md:hidden pointer-events-auto z-30 select-none touch-manipulation">
       {/* D-Pad Controls */}
       <div className="grid grid-cols-3 grid-rows-3 gap-1">
         {/* Empty top-left */}
         <div className="w-12 h-12"></div>
         {/* Up button */}
         <button
+          aria-label="Move Up"
           className="w-12 h-12 bg-gray-800/70 rounded-md flex items-center justify-center text-white select-none touch-manipulation z-30"
           onPointerDown={() => onDirectionPress('up')}
           onPointerUp={() => onDirectionPress(null)}
@@ -28,6 +29,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onDirectionPress, onAtt
         
         {/* Left button */}
         <button
+          aria-label="Move Left"
           className="w-12 h-12 bg-gray-800/70 rounded-md flex items-center justify-center text-white select-none touch-manipulation z-30"
           onPointerDown={() => onDirectionPress('left')}
           onPointerUp={() => onDirectionPress(null)}
@@ -41,6 +43,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onDirectionPress, onAtt
         <div className="w-12 h-12"></div>
         {/* Right button */}
         <button
+          aria-label="Move Right"
           className="w-12 h-12 bg-gray-800/70 rounded-md flex items-center justify-center text-white select-none touch-manipulation z-30"
           onPointerDown={() => onDirectionPress('right')}
           onPointerUp={() => onDirectionPress(null)}
@@ -55,6 +58,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onDirectionPress, onAtt
         <div className="w-12 h-12"></div>
         {/* Down button */}
         <button
+          aria-label="Move Down"
           className="w-12 h-12 bg-gray-800/70 rounded-md flex items-center justify-center text-white select-none touch-manipulation z-30"
           onPointerDown={() => onDirectionPress('down')}
           onPointerUp={() => onDirectionPress(null)}
@@ -70,6 +74,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onDirectionPress, onAtt
       
       {/* Attack Button */}
       <button
+        aria-label="Attack"
         className="w-16 h-16 bg-red-600/70 rounded-full flex items-center justify-center text-white select-none touch-manipulation z-30"
         onPointerDown={(e) => {
           e.preventDefault();
