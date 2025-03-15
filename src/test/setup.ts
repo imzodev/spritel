@@ -28,7 +28,7 @@ const mockCanvas = {
 }
 
 // Mock WebSocket
-global.WebSocket = class MockWebSocket {
+window.WebSocket = class MockWebSocket {
   onopen: () => void = () => {}
   onmessage: (event: any) => void = () => {}
   onclose: () => void = () => {}
@@ -37,9 +37,12 @@ global.WebSocket = class MockWebSocket {
 } as any
 
 // Mock HTMLCanvasElement
-global.HTMLCanvasElement.prototype.getContext = function() {
-  return mockCanvas.getContext()
-}
+window.HTMLCanvasElement.prototype.getContext = function(contextId: string) {
+  if (contextId === '2d') {
+    return mockCanvas.getContext() as CanvasRenderingContext2D;
+  }
+  return null;
+} as typeof window.HTMLCanvasElement.prototype.getContext;
 
 // Mock window properties used by Phaser
 Object.defineProperty(window, 'devicePixelRatio', { value: 1 })
