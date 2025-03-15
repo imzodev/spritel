@@ -10,19 +10,21 @@ export class MapManager {
     private readonly tileSize: number;
     private readonly transitionThreshold: number;
     private loadedMaps: Set<string>;
-    private currentLayers: { [key: string]: Phaser.Tilemaps.TilemapLayer | null } = {};
+    private currentLayers: {
+        [key: string]: Phaser.Tilemaps.TilemapLayer | null;
+    } = {};
     private isTransitioning: boolean = false;
 
     private static readonly AVAILABLE_MAPS: Set<string> = new Set([
-        'map_0_0',   // Starting map
-        'map_0_1',   // South
-        'map_0_-1',  // North
-        'map_1_0',   // East
-        'map_-1_0',  // West
-        'map_-1_-1', // South-West
-        'map_1_-1',  // South-East
-        'map_-1_1',  // North-West
-        'map_1_1',   // North-East
+        "map_0_0", // Starting map
+        "map_0_1", // South
+        "map_0_-1", // North
+        "map_1_0", // East
+        "map_-1_0", // West
+        "map_-1_-1", // South-West
+        "map_1_-1", // South-East
+        "map_-1_1", // North-West
+        "map_1_1", // North-East
     ]);
 
     constructor(
@@ -52,17 +54,17 @@ export class MapManager {
         try {
             // Always destroy the current map before loading a new one
             this.destroyCurrentMap();
-            
+
             // Clear the cache for this map to ensure fresh load
             this.scene.cache.tilemap.remove(mapKey);
-            
+
             await this.loadMapAssets(mapKey);
-            
+
             // Verify the map was loaded
             if (!this.scene.cache.tilemap.exists(mapKey)) {
                 throw new Error(`Failed to load tilemap: ${mapKey}`);
             }
-            
+
             this.currentMap = this.scene.cache.json.get(mapKey);
             this.currentPosition = { x, y };
             this.loadedMaps.add(mapKey);
@@ -78,14 +80,36 @@ export class MapManager {
 
     private async loadMapAssets(mapKey: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.scene.load.json(mapKey, `/assets/maps/${mapKey}.json`);
-            this.scene.load.tilemapTiledJSON(
-                mapKey,
-                `/assets/maps/${mapKey}.json`
+            console.log(
+                `[MapManager] Starting to load map assets for: ${mapKey}`
             );
 
-            this.scene.load.once("complete", resolve);
-            this.scene.load.once("loaderror", reject);
+            // Log the URL being used
+            const mapUrl = `/assets/maps/${mapKey}.json`;
+            console.log(`[MapManager] Loading from URL: ${mapUrl}`);
+
+            this.scene.load.json(mapKey, mapUrl);
+            this.scene.load.tilemapTiledJSON(mapKey, mapUrl);
+
+            this.scene.load.once("complete", () => {
+                // Verify the loaded data
+                const jsonData = this.scene.cache.json.get(mapKey);
+                console.log(`[MapManager] Loaded JSON data:`, jsonData);
+
+                const tilemapData = this.scene.cache.tilemap.get(mapKey);
+                console.log(`[MapManager] Loaded tilemap data:`, tilemapData);
+
+                resolve();
+            });
+
+            this.scene.load.once("loaderror", (fileObj: any) => {
+                console.error(
+                    `[MapManager] Failed to load map asset:`,
+                    fileObj
+                );
+                reject(new Error(`Failed to load map asset: ${mapKey}`));
+            });
+
             this.scene.load.start();
         });
     }
@@ -94,9 +118,9 @@ export class MapManager {
         // Clear collision layer first
         const gameScene = this.scene as GameScene;
         gameScene.setCollisionLayer(null);
-        
+
         // Then destroy the layers
-        Object.values(this.currentLayers).forEach(layer => {
+        Object.values(this.currentLayers).forEach((layer) => {
             if (layer) {
                 layer.destroy();
             }
@@ -104,7 +128,10 @@ export class MapManager {
         this.currentLayers = {};
 
         // Finally destroy the tilemap
-        const mapKey = this.getMapKey(this.currentPosition.x, this.currentPosition.y);
+        const mapKey = this.getMapKey(
+            this.currentPosition.x,
+            this.currentPosition.y
+        );
         const tilemap = this.scene.make.tilemap({ key: mapKey });
         if (tilemap) {
             tilemap.destroy();
@@ -134,9 +161,12 @@ export class MapManager {
     }
 
     private async createMap(): Promise<void> {
-        const mapKey = this.getMapKey(this.currentPosition.x, this.currentPosition.y);
-        console.log('Creating new map:', mapKey);
-        
+        const mapKey = this.getMapKey(
+            this.currentPosition.x,
+            this.currentPosition.y
+        );
+        console.log("Creating new map:", mapKey);
+
         const map = this.scene.make.tilemap({ key: mapKey });
         const tileset = map.addTilesetImage("beginnertileset", "tiles");
 
@@ -145,12 +175,12 @@ export class MapManager {
             return;
         }
 
-        console.log('Creating map layers...');
+        console.log("Creating map layers...");
         this.currentLayers = {
             ground: map.createLayer("Ground", tileset, 0, 0),
             decorationLower: map.createLayer("DecorationLower", tileset, 0, 0),
             decorationUpper: map.createLayer("DecorationUpper", tileset, 0, 0),
-            collision: map.createLayer("Collision", tileset, 0, 0)
+            collision: map.createLayer("Collision", tileset, 0, 0),
         };
 
         // Set proper depth for layers
@@ -164,21 +194,21 @@ export class MapManager {
             this.currentLayers.decorationUpper.setDepth(30);
         }
         if (this.currentLayers.collision) {
-            this.currentLayers.collision.setDepth(5);  // Keep collision layer below everything
+            this.currentLayers.collision.setDepth(5); // Keep collision layer below everything
         }
 
-        console.log('Layers created:', {
+        console.log("Layers created:", {
             ground: !!this.currentLayers.ground,
             decorationLower: !!this.currentLayers.decorationLower,
             decorationUpper: !!this.currentLayers.decorationUpper,
-            collision: !!this.currentLayers.collision
+            collision: !!this.currentLayers.collision,
         });
 
         if (this.currentLayers.collision) {
-            console.log('Setting up collision layer...');
+            console.log("Setting up collision layer...");
             const gameScene = this.scene as GameScene;
             gameScene.setCollisionLayer(this.currentLayers.collision);
-            console.log('Collision layer set up complete');
+            console.log("Collision layer set up complete");
         }
 
         this.scene.cameras.main.setBounds(
@@ -196,7 +226,6 @@ export class MapManager {
         const mapHeight = this.mapDimensions.height * this.tileSize;
         // console.log("Player position:", player.x, player.y, " Map Height: ", mapHeight);
 
-        
         if (player.x <= this.transitionThreshold) {
             this.handleTransition("west", player);
         } else if (player.x >= mapWidth - this.transitionThreshold) {
@@ -213,71 +242,75 @@ export class MapManager {
         player: Phaser.Physics.Arcade.Sprite
     ): Promise<void> {
         if (this.isTransitioning) return;
-        
+
         try {
             this.isTransitioning = true;
             const gameScene = this.scene as GameScene;
-            
+
             const newPosition = this.calculateNewPosition(direction);
             const newMapKey = this.getMapKey(newPosition.x, newPosition.y);
-            
-            console.log('[MapManager] Starting map transition:', {
+
+            console.log("[MapManager] Starting map transition:", {
                 direction,
                 from: this.currentPosition,
                 to: newPosition,
-                newMapKey
+                newMapKey,
             });
 
             if (!MapManager.AVAILABLE_MAPS.has(newMapKey)) {
-                console.log('[MapManager] Map not available:', newMapKey);
+                console.log("[MapManager] Map not available:", newMapKey);
                 this.bouncePlayer(player, direction);
                 return;
             }
 
             // Store other players' positions before transition
             const playersData = gameScene.getOtherPlayersData();
-            
+
             gameScene.startMapTransition();
-            
+
             // Calculate new player position before destroying current map
             const newPlayerPos = this.calculatePlayerTransitionPosition(
                 player,
                 direction
             );
-            
+
             // Clear old map
             this.destroyCurrentMap();
-            
+
             // Update position and create new map
             this.currentPosition = newPosition;
-            
+
             // Update the player's map position BEFORE creating the new map
             const playerEntity = gameScene.getPlayer();
             if (playerEntity) {
                 playerEntity.setMapPosition(newPosition.x, newPosition.y);
-                // Immediately notify network of map position change
                 gameScene.getNetworkManager().updatePlayerState(playerEntity);
             }
-            
+
             await this.createMap();
-            
+
+            // Preload adjacent maps for the new position
+            await this.preloadAdjacentMaps();
+
             // Update player position
             player.setPosition(newPlayerPos.x, newPlayerPos.y);
-            
+
             // Restore other players in their relative positions
             gameScene.restoreOtherPlayers(playersData, direction);
-            
         } catch (error) {
-            console.error('[MapManager] Map transition failed:', error);
+            console.error("[MapManager] Map transition failed:", error);
             this.bouncePlayer(player, direction);
         } finally {
+            this.isTransitioning = false;
             const gameScene = this.scene as GameScene;
             gameScene.endMapTransition();
-            this.isTransitioning = false;
         }
     }
 
-    private bouncePlayer(player: Phaser.Physics.Arcade.Sprite, direction: string): void {
+    private bouncePlayer(
+        player: Phaser.Physics.Arcade.Sprite,
+        direction: string
+    ): void {
         const bounceDistance = 10;
         const bounceSpeed = 100;
 
@@ -324,9 +357,15 @@ export class MapManager {
                 const mapKey = this.getMapKey(coord.x, coord.y);
                 try {
                     await new Promise<void>((resolve, reject) => {
-                        this.scene.load.json(mapKey, `/assets/maps/${mapKey}.json`);
-                        this.scene.load.tilemapTiledJSON(mapKey, `/assets/maps/${mapKey}.json`);
-                        
+                        this.scene.load.json(
+                            mapKey,
+                            `/assets/maps/${mapKey}.json`
+                        );
+                        this.scene.load.tilemapTiledJSON(
+                            mapKey,
+                            `/assets/maps/${mapKey}.json`
+                        );
+
                         this.scene.load.once("complete", () => resolve());
                         this.scene.load.once("loaderror", reject);
                         this.scene.load.start();
@@ -339,17 +378,21 @@ export class MapManager {
         };
 
         // Preload all adjacent maps
-        if (adjacentMaps.north) preloadPromises.push(preloadMap(adjacentMaps.north));
-        if (adjacentMaps.south) preloadPromises.push(preloadMap(adjacentMaps.south));
-        if (adjacentMaps.east) preloadPromises.push(preloadMap(adjacentMaps.east));
-        if (adjacentMaps.west) preloadPromises.push(preloadMap(adjacentMaps.west));
+        if (adjacentMaps.north)
+            preloadPromises.push(preloadMap(adjacentMaps.north));
+        if (adjacentMaps.south)
+            preloadPromises.push(preloadMap(adjacentMaps.south));
+        if (adjacentMaps.east)
+            preloadPromises.push(preloadMap(adjacentMaps.east));
+        if (adjacentMaps.west)
+            preloadPromises.push(preloadMap(adjacentMaps.west));
 
         await Promise.all(preloadPromises);
     }
 
     private calculateNewPosition(direction: string): MapCoordinate {
         const newPosition = { ...this.currentPosition };
-        
+
         switch (direction) {
             case "north":
                 newPosition.y++;
@@ -374,16 +417,16 @@ export class MapManager {
     ): { x: number; y: number } {
         const mapWidth = this.mapDimensions.width * this.tileSize;
         const mapHeight = this.mapDimensions.height * this.tileSize;
-        
+
         switch (direction) {
             case "north":
-                return { x: player.x, y: mapHeight - (this.tileSize * 2) };
+                return { x: player.x, y: mapHeight - this.tileSize * 2 };
             case "south":
                 return { x: player.x, y: this.tileSize * 2 };
             case "east":
                 return { x: this.tileSize * 2, y: player.y };
             case "west":
-                return { x: mapWidth - (this.tileSize * 2), y: player.y };
+                return { x: mapWidth - this.tileSize * 2, y: player.y };
             default:
                 return { x: player.x, y: player.y };
         }
