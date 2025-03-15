@@ -182,107 +182,76 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private setupNetworkHandlers(): void {
-        this.networkManager.on('connect', () => {
-            console.log('🎮 Connected to game server');
-            // Send initial position to server right after connection
-            this.networkManager.updatePlayerState(this.player);
-        });
-
         this.networkManager.on('game-state', (data) => {
-            console.log('📥 Received game state:', data.players);
-            
             // First game state received - set our player's ID but keep our position
             if (!this.player.getId() && data.players.length > 0) {
-                // Find our player in the received data (it will be the last one added)
                 const myPlayer = data.players[data.players.length - 1];
                 this.player.setId(myPlayer.id);
-                
-                console.log('🎮 Set player ID:', {
-                    id: this.player.getId(),
-                    x: this.player.getSprite().x,
-                    y: this.player.getSprite().y
-                });
-                
-                // Send our current position to server
+                // Send a single update after getting ID
                 this.networkManager.updatePlayerState(this.player);
             }
 
-            // Update other players
+            // Only process other players
             data.players.forEach((playerData: any) => {
-                if (playerData.id !== this.player.getId()) {
-                    const existingSprite = this.otherPlayers.get(playerData.id);
-                    if (existingSprite) {
-                        // Update existing player position and animation
-                        existingSprite.setPosition(playerData.x, playerData.y);
-                        if (playerData.animation && existingSprite.anims.currentAnim?.key !== playerData.animation) {
-                            existingSprite.play(playerData.animation, true);
-                        }
-                    } else {
-                        // Create new player
-                        console.log('➕ Creating other player:', playerData.id, 'at position:', playerData.x, playerData.y);
-                        this.createOtherPlayer(playerData);
-                    }
+                if (playerData.id && playerData.id !== this.player.getId()) {
+                    this.handlePlayerUpdate(playerData, 'game-state');
                 }
             });
         });
 
         this.networkManager.on('player-joined', (data) => {
-            console.log('👋 Player joined:', data.player);
-            // Only create other players, not yourself
-            if (data.player.id !== this.player.getId()) {
-                this.createOtherPlayer(data.player);
+            if (data.player.id && data.player.id !== this.player.getId()) {
+                this.handlePlayerUpdate(data.player, 'player-joined');
             }
         });
 
+        this.networkManager.on('player-update', (data) => {
+            if (!data.player.id || data.player.id === this.player.getId()) return;
+            this.handlePlayerUpdate(data.player, 'player-update');
+        });
+
         this.networkManager.on('player-left', (data) => {
-            console.log('💨 Player left:', data.playerId);
+            console.log('💨 Player Left Event:', {
+                playerId: data.playerId,
+                existingPlayers: Array.from(this.otherPlayers.keys())
+            });
+
             const sprite = this.otherPlayers.get(data.playerId);
             if (sprite) {
                 sprite.destroy();
                 this.otherPlayers.delete(data.playerId);
             }
         });
-
-        this.networkManager.on('player-update', (data) => {
-            // Ignore updates about our own player
-            if (data.player.id === this.player.getId()) return;
-            
-            const sprite = this.otherPlayers.get(data.player.id);
-            if (sprite) {
-                // Update position
-                sprite.setPosition(data.player.x, data.player.y);
-                
-                // Update animation if it's different
-                if (data.player.animation && sprite.anims.currentAnim?.key !== data.player.animation) {
-                    console.log('🎬 Updating player animation:', data.player.id, data.player.animation);
-                    sprite.play(data.player.animation, true);
-                }
-            } else {
-                console.log('➕ Late player creation:', data.player.id);
-                this.createOtherPlayer(data.player);
-            }
-        });
     }
 
-    private createOtherPlayer(playerData: any): void {
-        if (this.otherPlayers.has(playerData.id)) {
-            console.log('⚠️ Player already exists:', playerData.id);
+    private handlePlayerUpdate(playerData: any, source: string): void {
+        // Guard against invalid player data
+        if (!playerData.id) {
+            console.warn('Received player update with empty ID, ignoring');
             return;
         }
-        
-        console.log('🎮 Creating other player:', {
+
+        // Normalize the player data structure
+        const normalizedData = {
             id: playerData.id,
-            position: { x: playerData.x, y: playerData.y }
-        });
-        
-        const sprite = this.add.sprite(playerData.x, playerData.y, 'player');
-        sprite.setScale(0.5);
-        
-        // Create animations if they don't exist yet
-        this.ensureAnimationsExist();
-        
-        this.otherPlayers.set(playerData.id, sprite);
-        sprite.play(playerData.animation || 'idle-down');
+            x: playerData.x ?? playerData.position?.x ?? 100,
+            y: playerData.y ?? playerData.position?.y ?? 100,
+            animation: playerData.animation ?? 'idle-down'
+        };
+
+        const existingSprite = this.otherPlayers.get(normalizedData.id);
+        if (existingSprite) {
+            existingSprite.setPosition(normalizedData.x, normalizedData.y);
+            if (normalizedData.animation && existingSprite.anims.currentAnim?.key !== normalizedData.animation) {
+                existingSprite.play(normalizedData.animation, true);
+            }
+        } else {
+            const sprite = this.add.sprite(normalizedData.x, normalizedData.y, 'player');
+            sprite.setScale(0.5);
+            this.ensureAnimationsExist();
+            this.otherPlayers.set(normalizedData.id, sprite);
+            sprite.play(normalizedData.animation);
+        }
     }
 
     private ensureAnimationsExist(): void {
@@ -354,10 +323,7 @@ export default class GameScene extends Phaser.Scene {
         if (!this.player || !this.cursors || this.isTransitioning) return;
 
         const movement = this.getMovementInput();
-
-        // Simplified attack detection
-        const isAttackTriggered =
-            this.attackKey.isDown || this.virtualAttackTriggered;
+        const isAttackTriggered = this.attackKey.isDown || this.virtualAttackTriggered;
 
         if (isAttackTriggered) {
             this.isAttacking = true;
@@ -373,8 +339,10 @@ export default class GameScene extends Phaser.Scene {
             this.mapManager.checkMapTransition(this.player.getSprite());
         }
 
-        // Send player updates to server more frequently
-        this.networkManager.updatePlayerState(this.player);
+        // Only send updates when there are actual changes
+        if (movement.x !== 0 || movement.y !== 0 || isAttackTriggered) {
+            this.networkManager.updatePlayerState(this.player);
+        }
     }
 
     private getMovementInput(): { x: number; y: number } {
