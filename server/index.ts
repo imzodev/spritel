@@ -131,16 +131,29 @@ const server = Bun.serve<{ id: string }>({
     },
     close(ws) {
       const playerId = ws.data.id;
+      const player = state.players.get(playerId);
+      const mapPosition = player?.mapPosition; // Get the last known map position
+      
       state.players.delete(playerId);
       connectedClients.delete(ws);
       
       console.log(`\n👋 Player ${playerId} disconnected`);
       logGameState();
 
+      // Send player-left to everyone
       broadcast({
         type: "player-left",
         playerId,
       }, ws);
+
+      // If we have the player's last map position, also send player-left-map
+      if (mapPosition) {
+        broadcast({
+          type: "player-left-map",
+          playerId,
+          mapPosition
+        }, ws, mapPosition);
+      }
     },
   },
 });
