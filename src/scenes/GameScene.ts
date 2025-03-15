@@ -169,6 +169,12 @@ export default class GameScene extends Phaser.Scene {
     public startMapTransition(): void {
         this.isTransitioning = true;
         this.destroyCurrentLayers();
+        
+        // Clear all other players' sprites and physics bodies
+        this.otherPlayers.forEach(sprite => sprite.destroy());
+        this.otherPlayers.clear();
+        this.otherPlayersPhysics.forEach(sprite => sprite.destroy());
+        this.otherPlayersPhysics.clear();
     }
 
     public endMapTransition(): void {
@@ -204,6 +210,10 @@ export default class GameScene extends Phaser.Scene {
         // Clear existing sprites first
         this.otherPlayers.forEach(sprite => sprite.destroy());
         this.otherPlayers.clear();
+        
+        // Also clear physics sprites
+        this.otherPlayersPhysics.forEach(sprite => sprite.destroy());
+        this.otherPlayersPhysics.clear();
 
         const mapWidth = this.mapManager.getMapWidth();
         const mapHeight = this.mapManager.getMapHeight();
@@ -228,12 +238,23 @@ export default class GameScene extends Phaser.Scene {
                     break;
             }
 
+            // Create visible sprite
             const sprite = this.add.sprite(newX, newY, 'player');
             sprite.setScale(0.5);
-            this.ensureAnimationsExist();
-            sprite.play(playerData.animation);
-            sprite.setDepth(20); // Same depth as main player
             this.otherPlayers.set(playerData.id, sprite);
+            sprite.play(playerData.animation);
+            sprite.setDepth(20);
+
+            // Create physics sprite (invisible)
+            const physicsSprite = this.physics.add.sprite(newX, newY, 'player');
+            physicsSprite.setVisible(false);
+            physicsSprite.setScale(0.5);
+            physicsSprite.setImmovable(true);
+            physicsSprite.body.setSize(32, 32);
+            this.otherPlayersPhysics.set(playerData.id, physicsSprite);
+
+            // Add collision with the main player
+            this.physics.add.collider(this.player.getSprite(), physicsSprite);
         });
     }
 
