@@ -8,6 +8,9 @@ export class Player {
     private lastDirection: string = "down";
     private scene: Phaser.Scene;
     private isAttacking: boolean = false; // Add this to track attack state
+    private id: string;
+    private currentAnimation: string = 'idle-down';
+    private mapPosition: { x: number, y: number } = { x: 0, y: 0 };
 
     constructor(
         scene: Phaser.Scene,
@@ -16,6 +19,7 @@ export class Player {
         config: PlayerConfig,
         animConfig: AnimationConfig
     ) {
+        this.id = crypto.randomUUID();
         this.scene = scene;
         this.config = config;
         this.animConfig = animConfig;
@@ -152,7 +156,9 @@ export class Player {
 
         // Play walk animation in the current direction
         if (x !== 0 || y !== 0) {
-            this.sprite.anims.play(`walk-${this.lastDirection}`, true);
+            const walkAnim = `walk-${this.lastDirection}`;
+            this.currentAnimation = walkAnim;
+            this.sprite.anims.play(walkAnim, true);
         } else {
             this.playIdle();
         }
@@ -160,7 +166,7 @@ export class Player {
 
     private attack(): void {
         const attackAnim = `attack-${this.lastDirection}`;
-
+        this.currentAnimation = attackAnim;
         this.isAttacking = true;
         this.sprite.setVelocity(0, 0); // Stop movement during attack
         this.sprite.anims.play(attackAnim, true);
@@ -174,6 +180,7 @@ export class Player {
 
     private playIdle(): void {
         const idleAnim = `idle-${this.lastDirection}`;
+        this.currentAnimation = idleAnim;
         if (
             !this.sprite.anims.isPlaying ||
             !this.sprite.anims.currentAnim?.key.startsWith("idle-")
@@ -188,5 +195,21 @@ export class Player {
 
     public setPosition(x: number, y: number): void {
         this.sprite.setPosition(x, y);
+    }
+
+    public getId(): string {
+        return this.id;
+    }
+
+    public getCurrentAnimation(): string {
+        return this.currentAnimation;
+    }
+
+    public getMapPosition(): { x: number, y: number } {
+        return this.mapPosition;
+    }
+
+    public setMapPosition(x: number, y: number): void {
+        this.mapPosition = { x, y };
     }
 }

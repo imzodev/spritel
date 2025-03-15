@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { MapManager } from "../managers/MapManager";
 import { Player } from "../entities/Player";
+import { NetworkManager } from "../managers/NetworkManager";
 
 export default class GameScene extends Phaser.Scene {
     private player!: Player;
@@ -13,6 +14,8 @@ export default class GameScene extends Phaser.Scene {
     private virtualAttackTriggered: boolean = false;
     private isTransitioning: boolean = false;
     private isAttacking: boolean = false;
+    private networkManager!: NetworkManager;
+    private otherPlayers: Map<string, Phaser.GameObjects.Sprite> = new Map();
 
     constructor() {
         super({ key: "GameScene" });
@@ -55,6 +58,8 @@ export default class GameScene extends Phaser.Scene {
         this.initializeControls();
         this.createPlayer();
         this.setupCamera();
+        this.networkManager = new NetworkManager();
+        this.setupNetworkHandlers();
     }
 
     private initializeControls(): void {
@@ -171,6 +176,99 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
+    private setupNetworkHandlers(): void {
+        this.networkManager.on('game-state', (data) => {
+            // Only create other players, not ourselves
+            data.players.forEach((playerData: any) => {
+                if (playerData.id !== this.player.getId()) {
+                    this.createOtherPlayer(playerData);
+                }
+            });
+        });
+
+        this.networkManager.on('player-joined', (data) => {
+            if (data.player.id !== this.player.getId()) {
+                this.createOtherPlayer(data.player);
+            }
+        });
+
+        this.networkManager.on('player-left', (data) => {
+            const sprite = this.otherPlayers.get(data.playerId);
+            if (sprite) {
+                sprite.destroy();
+                this.otherPlayers.delete(data.playerId);
+            }
+        });
+
+        this.networkManager.on('player-update', (data) => {
+            if (data.player.id === this.player.getId()) return; // Ignore our own updates
+            
+            const sprite = this.otherPlayers.get(data.player.id);
+            if (sprite) {
+                sprite.setPosition(data.player.x, data.player.y);
+                // Only change animation if it's different from current
+                if (sprite.anims.currentAnim?.key !== data.player.animation) {
+                    sprite.play(data.player.animation, true);
+                }
+            }
+        });
+    }
+
+    private createOtherPlayer(playerData: any): void {
+        if (this.otherPlayers.has(playerData.id)) return; // Don't create duplicates
+        
+        const sprite = this.add.sprite(playerData.x, playerData.y, 'player');
+        sprite.setScale(0.5);
+        
+        // Create the same animations for other players
+        const animConfig = {
+            frameRate: 8,
+            framesPerRow: 13,
+            rows: {
+                idleUp: 22,
+                idleLeft: 23,
+                idleDown: 24,
+                idleRight: 25,
+                walkUp: 8,
+                walkLeft: 9,
+                walkDown: 10,
+                walkRight: 11,
+                attackUp: 12,
+                attackLeft: 13,
+                attackDown: 14,
+                attackRight: 15,
+            },
+        };
+
+        // Create animations for this sprite
+        ["up", "left", "down", "right"].forEach((direction) => {
+            // Idle animations
+            this.anims.create({
+                key: `idle-${direction}`,
+                frames: this.anims.generateFrameNumbers("player", {
+                    start: animConfig.rows[`idle${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow,
+                    end: animConfig.rows[`idle${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow + 1,
+                }),
+                frameRate: 1.5,
+                repeat: -1,
+            });
+
+            // Walk animations
+            this.anims.create({
+                key: `walk-${direction}`,
+                frames: this.anims.generateFrameNumbers("player", {
+                    start: animConfig.rows[`walk${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow,
+                    end: animConfig.rows[`walk${direction.charAt(0).toUpperCase() + direction.slice(1)}` as keyof typeof animConfig.rows] * animConfig.framesPerRow + 8,
+                }),
+                frameRate: 8,
+                repeat: -1,
+            });
+        });
+
+        this.otherPlayers.set(playerData.id, sprite);
+        sprite.play(playerData.animation || 'idle-down');
+    }
+
     update(time: number, delta: number): void {
         if (!this.player || !this.cursors || this.isTransitioning) return;
 
@@ -193,6 +291,9 @@ export default class GameScene extends Phaser.Scene {
         if (!this.isTransitioning) {
             this.mapManager.checkMapTransition(this.player.getSprite());
         }
+
+        // Send player updates to server
+        this.networkManager.updatePlayerState(this.player);
     }
 
     private getMovementInput(): { x: number; y: number } {
