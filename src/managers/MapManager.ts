@@ -19,6 +19,10 @@ export class MapManager {
         'map_0_-1',  // North
         'map_1_0',   // East
         'map_-1_0',  // West
+        'map_-1_-1', // South-West
+        'map_1_-1',  // South-East
+        'map_-1_1',  // North-West
+        'map_1_1',   // North-East
     ]);
 
     constructor(
@@ -314,10 +318,10 @@ export class MapManager {
         
         switch (direction) {
             case "north":
-                newPosition.y--;
+                newPosition.y++;
                 break;
             case "south":
-                newPosition.y++;
+                newPosition.y--;
                 break;
             case "east":
                 newPosition.x++;
