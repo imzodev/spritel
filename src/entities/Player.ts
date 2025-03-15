@@ -7,6 +7,7 @@ export class Player {
     private animConfig: AnimationConfig;
     private lastDirection: string = "down";
     private scene: Phaser.Scene;
+    private isAttacking: boolean = false; // Add this to track attack state
 
     constructor(
         scene: Phaser.Scene,
@@ -105,25 +106,37 @@ export class Player {
         movement: { x: number; y: number },
         isAttacking: boolean
     ): void {
-        // Handle attack first
+        // Update facing direction even during attack
+        if (movement.x !== 0 || movement.y !== 0) {
+            this.updateFacingDirection(movement);
+        }
+
+        // If we're in the middle of an attack animation, don't allow movement
+        if (this.isAttacking) {
+            return;
+        }
+
+        // Start new attack if requested
         if (isAttacking) {
             this.attack();
             return;
         }
 
-        // Only move if not attacking
+        // Handle regular movement
         this.move(movement);
+    }
+
+    private updateFacingDirection(movement: { x: number; y: number }): void {
+        if (movement.y < 0) this.lastDirection = "up";
+        else if (movement.y > 0) this.lastDirection = "down";
+        else if (movement.x < 0) this.lastDirection = "left";
+        else if (movement.x > 0) this.lastDirection = "right";
     }
 
     private move(movement: { x: number; y: number }): void {
         const { x, y } = movement;
 
-        // Only move if we're not in an attack animation
-        if (this.sprite.anims.currentAnim?.key.startsWith("attack-")) {
-            return;
-        }
-
-        // Normalize diagonal movement
+        // Set velocity based on input
         if (x !== 0 && y !== 0) {
             const factor = Math.SQRT1_2;
             this.sprite.setVelocity(
@@ -137,16 +150,9 @@ export class Player {
             );
         }
 
-        // Update animation
-        let direction = "";
-        if (y < 0) direction = "up";
-        else if (y > 0) direction = "down";
-        else if (x < 0) direction = "left";
-        else if (x > 0) direction = "right";
-
-        if (direction) {
-            this.lastDirection = direction;
-            this.sprite.anims.play(`walk-${direction}`, true);
+        // Play walk animation in the current direction
+        if (x !== 0 || y !== 0) {
+            this.sprite.anims.play(`walk-${this.lastDirection}`, true);
         } else {
             this.playIdle();
         }
@@ -154,14 +160,14 @@ export class Player {
 
     private attack(): void {
         const attackAnim = `attack-${this.lastDirection}`;
-        
-        // Always play the attack animation when requested
-        this.sprite.anims.stop();
+
+        this.isAttacking = true;
+        this.sprite.setVelocity(0, 0); // Stop movement during attack
         this.sprite.anims.play(attackAnim, true);
-        this.sprite.setVelocity(0, 0);
-        
-        // Return to idle when animation completes
-        this.sprite.once('animationcomplete', () => {
+
+        // Return to normal state when animation completes
+        this.sprite.once("animationcomplete", () => {
+            this.isAttacking = false;
             this.playIdle();
         });
     }
