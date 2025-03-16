@@ -7,6 +7,7 @@ export interface NPCConfig {
     scale?: number;
     interactionRadius?: number;
     defaultAnimation?: string;
+    mapCoordinates: { x: number, y: number }; // Add this new property
 }
 
 export class NPC {
@@ -24,10 +25,12 @@ export class NPC {
     private homePosition: { x: number, y: number };
     private wanderRadius: number = 100; // How far from home position the NPC can wander
     private currentAnimation: string = '';
+    private mapCoordinates: { x: number, y: number };
     
     constructor(scene: Phaser.Scene, config: NPCConfig) {
         this.scene = scene;
         this.interactionRadius = config.interactionRadius || 50;
+        this.mapCoordinates = config.mapCoordinates;
 
         // Create the NPC sprite
         this.sprite = scene.physics.add.sprite(config.x, config.y, config.texture);
@@ -220,5 +223,14 @@ export class NPC {
             this.currentAnimation = animationKey;
             this.sprite.play(animationKey, true);
         }
+    }
+
+    public getMapCoordinates(): { x: number, y: number } {
+        return this.mapCoordinates;
+    }
+
+    public shouldBeVisible(currentMapCoords: { x: number, y: number }): boolean {
+        return this.mapCoordinates.x === currentMapCoords.x && 
+               this.mapCoordinates.y === currentMapCoords.y;
     }
 }

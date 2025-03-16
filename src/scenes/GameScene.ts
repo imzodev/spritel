@@ -89,7 +89,8 @@ export default class GameScene extends Phaser.Scene {
             texture: 'npc_1',
             scale: 0.5,
             interactionRadius: 50,
-            defaultAnimation: 'npc_1_idle_down'
+            defaultAnimation: 'npc_1_idle_down',
+            mapCoordinates: { x: 0, y: 0 }  // Specify that this NPC belongs to map (0,0)
         });
 
         // Add debug logging

@@ -16,18 +16,26 @@ export class NPCManager {
         const npc = new NPC(this.scene, config);
         this.npcs.set(id, npc);
 
-        // Add collision with player
-        this.scene.physics.add.collider(
-            this.player.getSprite(),
-            npc.getSprite()
-        );
-
-        // Add collision with map if collision layer exists
-        if (this.collisionLayer) {
+        // Only add collision if the NPC is on the current map
+        const currentMapCoords = this.player.getMapPosition();
+        if (npc.shouldBeVisible(currentMapCoords)) {
+            // Add collision with player
             this.scene.physics.add.collider(
-                npc.getSprite(),
-                this.collisionLayer
+                this.player.getSprite(),
+                npc.getSprite()
             );
+
+            // Add collision with map if collision layer exists
+            if (this.collisionLayer) {
+                this.scene.physics.add.collider(
+                    npc.getSprite(),
+                    this.collisionLayer
+                );
+            }
+        } else {
+            // Hide NPC if it's not on the current map
+            npc.getSprite().setVisible(false);
+            npc.getSprite().body.enable = false;
         }
 
         return npc;
@@ -69,5 +77,14 @@ export class NPCManager {
         return Array.from(this.npcs.values()).filter(npc => 
             npc.isPlayerInRange(this.player.getSprite())
         );
+    }
+
+    public updateNPCVisibility(): void {
+        const currentMapCoords = this.player.getMapPosition();
+        this.npcs.forEach((npc, id) => {
+            const shouldBeVisible = npc.shouldBeVisible(currentMapCoords);
+            npc.getSprite().setVisible(shouldBeVisible);
+            npc.getSprite().body.enable = shouldBeVisible;
+        });
     }
 }
