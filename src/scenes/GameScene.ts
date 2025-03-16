@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { MapManager } from "../managers/MapManager";
 import { Player } from "../entities/Player";
 import { NetworkManager } from "../managers/NetworkManager";
+import { NPCManager } from "../managers/NPCManager";
 
 export default class GameScene extends Phaser.Scene {
     private player!: Player;
@@ -18,6 +19,8 @@ export default class GameScene extends Phaser.Scene {
     private otherPlayers: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private otherPlayersPhysics: Map<string, Phaser.Physics.Arcade.Sprite> = new Map();
     private initialized: boolean = false;
+    private npcManager!: NPCManager;
+    private interactKey!: Phaser.Input.Keyboard.Key;
 
     constructor() {
         super({ key: "GameScene" });
@@ -44,14 +47,20 @@ export default class GameScene extends Phaser.Scene {
             frameWidth: 64,
             frameHeight: 64,
         });
+        
+        // Add specific logging for npc_1 loading
+        this.load.spritesheet("npc_1", "/assets/npc_1.png", {
+            frameWidth: 64,
+            frameHeight: 64
+        });
 
         // Add load complete handler
         this.load.on("complete", () => {
             console.log("Assets loaded:", this.textures.list);
-            if (this.textures.exists("player")) {
-                console.log("Player texture loaded successfully");
+            if (this.textures.exists("npc_1")) {
+                console.log("NPC texture loaded successfully");
             } else {
-                console.error("Player texture failed to load");
+                console.error("NPC texture failed to load");
             }
         });
     }
@@ -65,6 +74,40 @@ export default class GameScene extends Phaser.Scene {
         this.setupCamera();
         this.networkManager = new NetworkManager();
         this.setupNetworkHandlers();
+        
+        // First create the animations
+        this.createNPCAnimations();
+        
+        // Initialize NPCManager
+        this.npcManager = new NPCManager(this, this.player);
+        
+        // Create merchant NPC - let's position it near the player for testing
+        const playerSprite = this.player.getSprite();
+        this.npcManager.createNPC('merchant', {
+            x: playerSprite.x + 100, // 100 pixels to the right of player
+            y: playerSprite.y,       // same y as player
+            texture: 'npc_1',
+            scale: 0.5,
+            interactionRadius: 50,
+            defaultAnimation: 'npc_1_idle_down'
+        });
+
+        // Add debug logging
+        console.log('NPC created at:', playerSprite.x + 100, playerSprite.y);
+        const npc = this.npcManager.getNPC('merchant');
+        if (npc) {
+            const sprite = npc.getSprite();
+            console.log('NPC sprite exists:', !!sprite);
+            console.log('NPC sprite visible:', sprite.visible);
+            console.log('NPC sprite position:', sprite.x, sprite.y);
+            console.log('NPC sprite texture:', sprite.texture.key);
+            console.log('NPC sprite scale:', sprite.scale);
+        }
+
+        // Add interaction key
+        this.interactKey = this.input.keyboard.addKey(
+            Phaser.Input.Keyboard.KeyCodes.E
+        );
     }
 
     private initializeControls(): void {
@@ -507,6 +550,54 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
+    private createNPCAnimations(): void {
+        if (!this.anims.exists('npc_1_idle_down')) {
+            this.anims.create({
+                key: 'npc_1_idle_up',
+                frames: this.anims.generateFrameNumbers('npc_1', { 
+                    start: 0 * 24, // Row 0 (idle up)
+                    end: 0 * 24 + 12
+                }),
+                frameRate: 0.5,
+                repeat: -1,
+                yoyo: true
+            });
+
+            this.anims.create({
+                key: 'npc_1_idle_left',
+                frames: this.anims.generateFrameNumbers('npc_1', { 
+                    start: 1 * 24, // Row 1 (idle left)
+                    end: 1 * 24 + 12
+                }),
+                frameRate: 0.5,
+                repeat: -1,
+                yoyo: true
+            });
+            this.anims.create({
+                key: 'npc_1_idle_down',
+                frames: this.anims.generateFrameNumbers('npc_1', { 
+                    start: 2 * 24, // Row 2 (idle down)
+                    end: 2 * 24 + (2 - 1),
+                }),
+                frameRate: 0.5,
+                repeat: -1,
+                yoyo: true
+            });
+
+
+            this.anims.create({
+                key: 'npc_1_idle_right',
+                frames: this.anims.generateFrameNumbers('npc_1', { 
+                    start: 3 * 24, // Row 3 (idle right)
+                    end: 3 * 24 + 12
+                }),
+                frameRate: 0.5,
+                repeat: -1,
+                yoyo: true
+            });
+        }
+    }
+
     update(time: number, delta: number): void {
         if (!this.player || !this.cursors || this.isTransitioning) return;
 
@@ -530,6 +621,29 @@ export default class GameScene extends Phaser.Scene {
         // Only send updates when there are actual changes
         if (movement.x !== 0 || movement.y !== 0 || isAttackTriggered) {
             this.networkManager.updatePlayerState(this.player);
+        }
+
+        // Debug: Log NPC position
+        const npc = this.npcManager.getNPC('merchant');
+        if (npc) {
+            const sprite = npc.getSprite();
+            if (sprite.x === 0 || sprite.y === 0) {
+                console.warn('NPC at origin point!');
+            }
+        }
+
+        this.npcManager.update();
+
+        // Check for interaction key press
+        if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+            const npcsInRange = this.npcManager.getNPCsInRange();
+            if (npcsInRange.length > 0) {
+                // Interact with the closest NPC
+                const npc = npcsInRange[0];
+                npc.setState('talking');
+                // TODO: Trigger dialogue system
+                console.log('Interacting with NPC:', npc);
+            }
         }
     }
 
