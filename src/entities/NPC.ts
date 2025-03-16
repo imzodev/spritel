@@ -92,13 +92,24 @@ export class NPC {
         );
 
         if (distanceFromHome > this.wanderRadius) {
-            // Head back towards home
-            const angle = Phaser.Math.Angle.Between(
-                this.sprite.x, this.sprite.y,
-                this.homePosition.x, this.homePosition.y
-            );
-            this.currentVelocity.x = Math.cos(angle) * this.walkSpeed;
-            this.currentVelocity.y = Math.sin(angle) * this.walkSpeed;
+            // Calculate direction to home
+            const dx = this.homePosition.x - this.sprite.x;
+            const dy = this.homePosition.y - this.sprite.y;
+            
+            // Reset current velocity
+            this.currentVelocity.x = 0;
+            this.currentVelocity.y = 0;
+
+            // Choose either horizontal or vertical movement, not both
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Move horizontally
+                this.currentVelocity.x = dx > 0 ? this.walkSpeed : -this.walkSpeed;
+                this.setFacing(dx > 0 ? 'right' : 'left');
+            } else {
+                // Move vertically
+                this.currentVelocity.y = dy > 0 ? this.walkSpeed : -this.walkSpeed;
+                this.setFacing(dy > 0 ? 'down' : 'up');
+            }
         }
 
         // Apply velocity
