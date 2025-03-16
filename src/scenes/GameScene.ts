@@ -106,9 +106,13 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Add interaction key
-        this.interactKey = this.input.keyboard.addKey(
-            Phaser.Input.Keyboard.KeyCodes.E
-        );
+        if (this.input.keyboard) {
+            this.interactKey = this.input.keyboard.addKey(
+                Phaser.Input.Keyboard.KeyCodes.E
+            );
+        } else {
+            console.error("Keyboard input not available");
+        }
     }
 
     private initializeControls(): void {

@@ -35,7 +35,10 @@ export class NPCManager {
         } else {
             // Hide NPC if it's not on the current map
             npc.getSprite().setVisible(false);
-            npc.getSprite().body.enable = false;
+            const body = npc.getSprite().body;
+            if (body) {
+                body.enable = false;
+            }
         }
 
         return npc;
@@ -84,7 +87,10 @@ export class NPCManager {
         this.npcs.forEach((npc, id) => {
             const shouldBeVisible = npc.shouldBeVisible(currentMapCoords);
             npc.getSprite().setVisible(shouldBeVisible);
-            npc.getSprite().body.enable = shouldBeVisible;
+            const body = npc.getSprite().body;
+            if (body) {
+                body.enable = shouldBeVisible;
+            }
         });
     }
 }

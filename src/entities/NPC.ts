@@ -13,7 +13,7 @@ export interface NPCConfig {
 export class NPC {
     private sprite: Phaser.Physics.Arcade.Sprite;
     private scene: Phaser.Scene;
-    private interactionZone: Phaser.GameObjects.Circle;
+    private interactionZone: Phaser.GameObjects.Arc;
     private state: 'idle' | 'walking' | 'talking' | 'busy' = 'idle';
     private interactionRadius: number;
     private facing: 'up' | 'down' | 'left' | 'right' = 'down';
@@ -38,8 +38,10 @@ export class NPC {
         
         // Configure physics body
         this.sprite.setCollideWorldBounds(true);  // Keep NPC within world bounds
-        this.sprite.body.setSize(32, 32);         // Set collision body size
-        this.sprite.body.setOffset(16, 32);       // Adjust collision body offset
+        if (this.sprite.body) {
+            this.sprite.body.setSize(32, 32);         // Set collision body size
+            this.sprite.body.setOffset(16, 32);       // Adjust collision body offset
+        }
         
         // Don't allow the NPC to be pushed by collisions
         this.sprite.setImmovable(true);
@@ -55,7 +57,7 @@ export class NPC {
         }
         
         // Create interaction zone
-        this.interactionZone = scene.add.circle(
+        this.interactionZone = scene.add.arc(
             config.x,
             config.y,
             this.interactionRadius,
@@ -191,7 +193,7 @@ export class NPC {
         return this.sprite;
     }
 
-    public getInteractionZone(): Phaser.GameObjects.Circle {
+    public getInteractionZone(): Phaser.GameObjects.Arc {
         return this.interactionZone;
     }
 
