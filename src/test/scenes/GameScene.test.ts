@@ -3,11 +3,14 @@ import GameScene from '../../scenes/GameScene'
 import { Player } from '../../entities/Player'
 import { MapManager } from '../../managers/MapManager'
 import { NetworkManager } from '../../managers/NetworkManager'
+import { NPCManager } from '../../managers/NPCManager'; // Import the class
+import Phaser from 'phaser'
 
 // Mock dependencies
 vi.mock('../../entities/Player')
 vi.mock('../../managers/MapManager')
 vi.mock('../../managers/NetworkManager')
+vi.mock('../../managers/NPCManager')
 
 // Mock Phaser
 const mockCollider = {
@@ -78,6 +81,20 @@ vi.mock('phaser', () => ({
                 this.textures = {
                     exists: vi.fn(),
                     list: []
+                }
+            }
+        },
+        Physics: {
+            Arcade: {
+                Sprite: class {}
+            }
+        },
+        Input: {
+            Keyboard: {
+                JustDown: vi.fn().mockReturnValue(false),
+                KeyCodes: {
+                    SPACE: 32,
+                    E: 69
                 }
             }
         }
@@ -225,32 +242,51 @@ describe('GameScene', () => {
     })
 
     describe('Update Loop', () => {
-        it('should not update when player is not initialized', () => {
-            ;(gameScene as any).player = null
-            gameScene.update(0, 0)
-            expect(mockMapManager.checkMapTransition).not.toHaveBeenCalled()
-        })
-
-        it('should not update during transition', () => {
-            ;(gameScene as any).isTransitioning = true
-            gameScene.update(0, 0)
-            expect(mockPlayer.update).not.toHaveBeenCalled()
-        })
-
-        it('should update player and check map transition during normal gameplay', () => {
-            ;(gameScene as any).cursors = {
+        beforeEach(() => {
+            
+            gameScene['isTransitioning'] = false;
+            gameScene['cursors'] = {
                 left: { isDown: false },
                 right: { isDown: false },
                 up: { isDown: false },
                 down: { isDown: false }
-            }
-            ;(gameScene as any).attackKey = { isDown: false }
+            };
+            gameScene['attackKey'] = { isDown: false };
+            gameScene['interactKey'] = { isDown: false };
+            gameScene['virtualDirection'] = null;
+            gameScene['virtualAttackTriggered'] = false;
+            gameScene['isAttacking'] = false;
+        });
+    
+        afterEach(() => {
+            vi.clearAllMocks();
+        });
+    
+        it('should not update when player is not initialized', () => {
+            ;(gameScene as any).player = null;
+            gameScene.update(0, 0);
+            expect(mockMapManager.checkMapTransition).not.toHaveBeenCalled();
+        });
+    
+        it('should not update during transition', () => {
+            ;(gameScene as any).isTransitioning = true;
+            gameScene.update(0, 0);
+            expect(mockPlayer.update).not.toHaveBeenCalled();
+        });
+    
+        it('should update player and check map transition during normal gameplay', () => {
+            // Ensure Phaser.Input.Keyboard.JustDown exists and returns false
+            const mockJustDown = vi.fn().mockReturnValue(false);
+            Phaser.Input.Keyboard.JustDown = mockJustDown;
             
-            gameScene.update(0, 0)
-            
-            expect(mockPlayer.update).toHaveBeenCalled()
-            expect(mockMapManager.checkMapTransition).toHaveBeenCalled()
-        })
+            // Run update
+            gameScene.update(0, 0);
+    
+            // Verify expected behavior
+            expect(mockPlayer.update).toHaveBeenCalledWith({ x: 0, y: 0 }, false);
+            expect(mockMapManager.checkMapTransition).toHaveBeenCalledWith(mockPlayer.getSprite());
+            expect(mockJustDown).toHaveBeenCalledWith(gameScene['interactKey']);
+        });
     })
 
     describe('Network Player Management', () => {

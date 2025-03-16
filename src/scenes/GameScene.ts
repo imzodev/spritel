@@ -746,15 +746,22 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Debug: Log NPC position
-        const npc = this.npcManager.getNPC('merchant');
-        if (npc) {
-            const sprite = npc.getSprite();
-            if (sprite.x === 0 || sprite.y === 0) {
-                console.warn('NPC at origin point!');
+        if (this.npcManager) {  // Add null check
+            const npc = this.npcManager.getNPC('merchant');
+            if (npc) {
+                const sprite = npc.getSprite();
+                if (sprite.x === 0 || sprite.y === 0) {
+                    console.warn('NPC at origin point!');
+                }
             }
+        } else {
+            console.error('NPCManager is not initialized!');
         }
 
-        this.npcManager.update();
+        // Only update NPCManager if it exists
+        if (this.npcManager) {
+            this.npcManager.update();
+        }
 
         // Check for interaction key press
         if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
