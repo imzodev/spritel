@@ -5,6 +5,7 @@ export class NPCManager {
     private npcs: Map<string, NPC> = new Map();
     private scene: Phaser.Scene;
     private player: Player;
+    private collisionLayer: Phaser.Tilemaps.TilemapLayer | null = null;
 
     constructor(scene: Phaser.Scene, player: Player) {
         this.scene = scene;
@@ -21,7 +22,29 @@ export class NPCManager {
             npc.getSprite()
         );
 
+        // Add collision with map if collision layer exists
+        if (this.collisionLayer) {
+            this.scene.physics.add.collider(
+                npc.getSprite(),
+                this.collisionLayer
+            );
+        }
+
         return npc;
+    }
+
+    public setCollisionLayer(layer: Phaser.Tilemaps.TilemapLayer | null): void {
+        this.collisionLayer = layer;
+        
+        // Update collision for all existing NPCs
+        this.npcs.forEach(npc => {
+            if (layer) {
+                this.scene.physics.add.collider(
+                    npc.getSprite(),
+                    layer
+                );
+            }
+        });
     }
 
     public update(): void {

@@ -186,6 +186,12 @@ export default class GameScene extends Phaser.Scene {
                     newLayer
                 );
             }
+
+            // Add collision for NPCs
+            if (this.npcManager) {
+                this.npcManager.setCollisionLayer(newLayer);
+            }
+
         } catch (error) {
             console.error("Failed to set up collision:", error);
             this.collisionLayer = null;

@@ -32,15 +32,18 @@ export class NPC {
         // Create the NPC sprite
         this.sprite = scene.physics.add.sprite(config.x, config.y, config.texture);
         this.sprite.setScale(config.scale || 0.5);
+        
+        // Configure physics body
+        this.sprite.setCollideWorldBounds(true);  // Keep NPC within world bounds
+        this.sprite.body.setSize(32, 32);         // Set collision body size
+        this.sprite.body.setOffset(16, 32);       // Adjust collision body offset
+        
+        // Don't allow the NPC to be pushed by collisions
         this.sprite.setImmovable(true);
         
         // Ensure the sprite is visible and at the correct depth
         this.sprite.setVisible(true);
         this.sprite.setDepth(20); // Same depth as player for consistency
-        
-        // Set up body size and offset for better collision
-        this.sprite.body.setSize(32, 32);
-        this.sprite.body.setOffset(16, 32);
         
         // Start default animation if provided
         if (config.defaultAnimation) {
