@@ -556,7 +556,7 @@ export default class GameScene extends Phaser.Scene {
                 key: 'npc_1_idle_up',
                 frames: this.anims.generateFrameNumbers('npc_1', { 
                     start: 0 * 24, // Row 0 (idle up)
-                    end: 0 * 24 + 12
+                    end: 0 * 24 + (2 - 1),
                 }),
                 frameRate: 0.5,
                 repeat: -1,
@@ -567,7 +567,7 @@ export default class GameScene extends Phaser.Scene {
                 key: 'npc_1_idle_left',
                 frames: this.anims.generateFrameNumbers('npc_1', { 
                     start: 1 * 24, // Row 1 (idle left)
-                    end: 1 * 24 + 12
+                    end: 1 * 24 + (2 - 1),
                 }),
                 frameRate: 0.5,
                 repeat: -1,
@@ -589,7 +589,7 @@ export default class GameScene extends Phaser.Scene {
                 key: 'npc_1_idle_right',
                 frames: this.anims.generateFrameNumbers('npc_1', { 
                     start: 3 * 24, // Row 3 (idle right)
-                    end: 3 * 24 + 12
+                    end: 3 * 24 + (2 - 1),
                 }),
                 frameRate: 0.5,
                 repeat: -1,
@@ -602,10 +602,10 @@ export default class GameScene extends Phaser.Scene {
                 key: 'npc_1_walk_down',
                 frames: this.anims.generateFrameNumbers('npc_1', { 
                     start: 10 * 24, // Row 10 (walk down)
-                    end: 10 * 24 + 8
+                    end: 10 * 24 + (9 - 1)
                 }),
                 frameRate: 8,
-                repeat: -1
+                repeat: 0
             });
 
             // Up
@@ -613,10 +613,10 @@ export default class GameScene extends Phaser.Scene {
                 key: 'npc_1_walk_up',
                 frames: this.anims.generateFrameNumbers('npc_1', { 
                     start: 8 * 24, // Row 8 (walk up)
-                    end: 8 * 24 + 8
+                    end: 8 * 24 + (9 - 1)
                 }),
                 frameRate: 8,
-                repeat: -1
+                repeat: 0
             });
 
             // Left
@@ -624,10 +624,10 @@ export default class GameScene extends Phaser.Scene {
                 key: 'npc_1_walk_left',
                 frames: this.anims.generateFrameNumbers('npc_1', { 
                     start: 9 * 24, // Row 9 (walk left)
-                    end: 9 * 24 + 8
+                    end: 9 * 24 + (9 - 1)
                 }),
                 frameRate: 8,
-                repeat: -1
+                repeat: 0
             });
 
             // Right
@@ -635,10 +635,10 @@ export default class GameScene extends Phaser.Scene {
                 key: 'npc_1_walk_right',
                 frames: this.anims.generateFrameNumbers('npc_1', { 
                     start: 11 * 24, // Row 11 (walk right)
-                    end: 11 * 24 + 8
+                    end: 11 * 24 + (9 - 1)
                 }),
                 frameRate: 8,
-                repeat: -1
+                repeat: 0
             });
         }
     }

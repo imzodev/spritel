@@ -129,10 +129,31 @@ export class NPC {
             return;
         }
 
-        // Random angle
-        const angle = Phaser.Math.DegToRad(Phaser.Math.Between(0, 360));
-        this.currentVelocity.x = Math.cos(angle) * this.walkSpeed;
-        this.currentVelocity.y = Math.sin(angle) * this.walkSpeed;
+        // Choose a random direction (0: up, 1: right, 2: down, 3: left)
+        const direction = Phaser.Math.Between(0, 3);
+        
+        // Reset velocities
+        this.currentVelocity.x = 0;
+        this.currentVelocity.y = 0;
+
+        switch (direction) {
+            case 0: // up
+                this.currentVelocity.y = -this.walkSpeed;
+                this.setFacing('up');
+                break;
+            case 1: // right
+                this.currentVelocity.x = this.walkSpeed;
+                this.setFacing('right');
+                break;
+            case 2: // down
+                this.currentVelocity.y = this.walkSpeed;
+                this.setFacing('down');
+                break;
+            case 3: // left
+                this.currentVelocity.x = -this.walkSpeed;
+                this.setFacing('left');
+                break;
+        }
     }
 
     public isPlayerInRange(player: Phaser.Physics.Arcade.Sprite): boolean {
