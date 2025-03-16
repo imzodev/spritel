@@ -432,7 +432,13 @@ export default class GameScene extends Phaser.Scene {
         });
 
         this.networkManager.on('initial-npc-states', (data) => {
-            data.npcs.forEach(npcData => {
+            interface NPCData {
+                id: string;
+                x: number;
+                y: number;
+                mapCoordinates: { x: number; y: number };
+            }
+            data.npcs.forEach((npcData: NPCData) => {
                 // Only create if NPC doesn't exist
                 if (!this.npcManager.getNPC(npcData.id)) {
                     this.npcManager.createNPC(npcData.id, {
