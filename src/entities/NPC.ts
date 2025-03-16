@@ -23,7 +23,8 @@ export class NPC {
     private walkSpeed: number = 50; // Slow walking speed
     private homePosition: { x: number, y: number };
     private wanderRadius: number = 100; // How far from home position the NPC can wander
-
+    private currentAnimation: string = '';
+    
     constructor(scene: Phaser.Scene, config: NPCConfig) {
         this.scene = scene;
         this.interactionRadius = config.interactionRadius || 50;
@@ -72,6 +73,7 @@ export class NPC {
         // Don't move if talking or busy
         if (this.state === 'talking' || this.state === 'busy') {
             this.sprite.setVelocity(0, 0);
+            this.playAnimation('idle');
             return;
         }
 
@@ -102,19 +104,13 @@ export class NPC {
         // Apply velocity
         this.sprite.setVelocity(this.currentVelocity.x, this.currentVelocity.y);
 
-        // Update facing direction based on movement
+        // Update state and animation
         if (this.currentVelocity.x !== 0 || this.currentVelocity.y !== 0) {
             this.state = 'walking';
-            // Determine facing direction based on velocity
-            if (Math.abs(this.currentVelocity.x) > Math.abs(this.currentVelocity.y)) {
-                this.setFacing(this.currentVelocity.x > 0 ? 'right' : 'left');
-            } else {
-                this.setFacing(this.currentVelocity.y > 0 ? 'down' : 'up');
-            }
+            this.playAnimation('walk');
         } else {
             this.state = 'idle';
-            // Play idle animation in current direction
-            this.sprite.play(`${this.sprite.texture.key}_idle_${this.facing}`, true);
+            this.playAnimation('idle');
         }
     }
 
@@ -183,9 +179,11 @@ export class NPC {
     }
 
     public setFacing(direction: 'up' | 'down' | 'left' | 'right'): void {
-        this.facing = direction;
-        const texture = this.sprite.texture.key;
-        this.sprite.play(`${texture}_idle_${direction}`, true);
+        if (this.facing !== direction) {
+            this.facing = direction;
+            // Update animation immediately when direction changes
+            this.playAnimation(this.state === 'walking' ? 'walk' : 'idle');
+        }
     }
 
     public getFacing(): string {
@@ -198,5 +196,15 @@ export class NPC {
             x: this.sprite.x,
             y: this.sprite.y
         };
+    }
+
+    private playAnimation(type: 'idle' | 'walk'): void {
+        const animationKey = `${this.sprite.texture.key}_${type}_${this.facing}`;
+        
+        // Only change animation if it's different from the current one
+        if (this.currentAnimation !== animationKey) {
+            this.currentAnimation = animationKey;
+            this.sprite.play(animationKey, true);
+        }
     }
 }

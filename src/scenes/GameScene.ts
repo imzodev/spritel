@@ -605,7 +605,7 @@ export default class GameScene extends Phaser.Scene {
                     end: 10 * 24 + (9 - 1)
                 }),
                 frameRate: 8,
-                repeat: 0
+                repeat: -1  // Set to -1 for continuous walking animation
             });
 
             // Up
@@ -616,7 +616,7 @@ export default class GameScene extends Phaser.Scene {
                     end: 8 * 24 + (9 - 1)
                 }),
                 frameRate: 8,
-                repeat: 0
+                repeat: -1
             });
 
             // Left
@@ -627,7 +627,7 @@ export default class GameScene extends Phaser.Scene {
                     end: 9 * 24 + (9 - 1)
                 }),
                 frameRate: 8,
-                repeat: 0
+                repeat: -1
             });
 
             // Right
@@ -638,7 +638,7 @@ export default class GameScene extends Phaser.Scene {
                     end: 11 * 24 + (9 - 1)
                 }),
                 frameRate: 8,
-                repeat: 0
+                repeat: -1
             });
         }
     }
