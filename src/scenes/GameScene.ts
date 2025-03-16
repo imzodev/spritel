@@ -257,29 +257,6 @@ export default class GameScene extends Phaser.Scene {
             }
         }
         
-        // Recreate NPCs for the new map
-        const currentMapData = this.mapManager.getCurrentMap();
-        if (currentMapData) {
-            const [_, currentX, currentY] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
-            const mapPosition = { 
-                x: parseInt(currentX), 
-                y: parseInt(currentY) 
-            };
-            
-            // Recreate merchant NPC if we're in map (0,0)
-            if (mapPosition.x === 0 && mapPosition.y === 0) {
-                this.npcManager.createNPC('merchant', {
-                    x: 100, // You might want to adjust these coordinates
-                    y: 100,
-                    texture: 'npc_1',
-                    scale: 0.5,
-                    interactionRadius: 50,
-                    defaultAnimation: 'npc_1_idle_down',
-                    mapCoordinates: { x: 0, y: 0 }
-                });
-            }
-        }
-        
         this.isTransitioning = false;
         // Send updated position to network after transition
         this.networkManager.updatePlayerState(this.player);
@@ -351,6 +328,22 @@ export default class GameScene extends Phaser.Scene {
             // Add collision with the main player
             this.physics.add.collider(this.player.getSprite(), physicsSprite);
         });
+    }
+
+    public restoreNPCs(mapPosition: { x: number, y: number }): void {
+        // Recreate NPCs for the new map position
+        if (mapPosition.x === 0 && mapPosition.y === 0) {
+            this.npcManager.createNPC('merchant', {
+                x: 100,
+                y: 100,
+                texture: 'npc_1',
+                scale: 0.5,
+                interactionRadius: 50,
+                defaultAnimation: 'npc_1_idle_down',
+                mapCoordinates: { x: 0, y: 0 }
+            });
+        }
+        // Add more map position conditions for other NPCs as needed
     }
 
     private setupNetworkHandlers(): void {
