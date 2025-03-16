@@ -61,10 +61,13 @@ export class NPC {
             config.x,
             config.y,
             this.interactionRadius,
-            0xffffff,
-            0.2
+            0,                  // startAngle
+            360,               // endAngle
+            false,             // anticlockwise
+            0x00ff00,          // color (green)
+            0.3                // alpha - increased from 0.2
         );
-        this.interactionZone.setVisible(false);
+        this.interactionZone.setVisible(false);  // Still starts invisible, but will be shown when in range
         this.interactionZone.setDepth(19); // Below the NPC
 
         // Set up physics body for interaction zone
