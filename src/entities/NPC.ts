@@ -16,6 +16,13 @@ export class NPC {
     private state: 'idle' | 'walking' | 'talking' | 'busy' = 'idle';
     private interactionRadius: number;
     private facing: 'up' | 'down' | 'left' | 'right' = 'down';
+    
+    // Add new properties for movement
+    private moveTimer: number = 0;
+    private currentVelocity: { x: number, y: number } = { x: 0, y: 0 };
+    private walkSpeed: number = 50; // Slow walking speed
+    private homePosition: { x: number, y: number };
+    private wanderRadius: number = 100; // How far from home position the NPC can wander
 
     constructor(scene: Phaser.Scene, config: NPCConfig) {
         this.scene = scene;
@@ -53,11 +60,79 @@ export class NPC {
 
         // Set up physics body for interaction zone
         scene.physics.add.existing(this.interactionZone, true);
+
+        // Store initial position as home position
+        this.homePosition = { x: config.x, y: config.y };
     }
 
     public update(): void {
         // Update interaction zone position to follow NPC
         this.interactionZone.setPosition(this.sprite.x, this.sprite.y);
+
+        // Don't move if talking or busy
+        if (this.state === 'talking' || this.state === 'busy') {
+            this.sprite.setVelocity(0, 0);
+            return;
+        }
+
+        // Decrease move timer
+        this.moveTimer -= this.scene.game.loop.delta;
+
+        // Time to change direction or stop/start moving
+        if (this.moveTimer <= 0) {
+            this.decideNewMovement();
+        }
+
+        // Check if NPC has wandered too far from home
+        const distanceFromHome = Phaser.Math.Distance.Between(
+            this.sprite.x, this.sprite.y,
+            this.homePosition.x, this.homePosition.y
+        );
+
+        if (distanceFromHome > this.wanderRadius) {
+            // Head back towards home
+            const angle = Phaser.Math.Angle.Between(
+                this.sprite.x, this.sprite.y,
+                this.homePosition.x, this.homePosition.y
+            );
+            this.currentVelocity.x = Math.cos(angle) * this.walkSpeed;
+            this.currentVelocity.y = Math.sin(angle) * this.walkSpeed;
+        }
+
+        // Apply velocity
+        this.sprite.setVelocity(this.currentVelocity.x, this.currentVelocity.y);
+
+        // Update facing direction based on movement
+        if (this.currentVelocity.x !== 0 || this.currentVelocity.y !== 0) {
+            this.state = 'walking';
+            // Determine facing direction based on velocity
+            if (Math.abs(this.currentVelocity.x) > Math.abs(this.currentVelocity.y)) {
+                this.setFacing(this.currentVelocity.x > 0 ? 'right' : 'left');
+            } else {
+                this.setFacing(this.currentVelocity.y > 0 ? 'down' : 'up');
+            }
+        } else {
+            this.state = 'idle';
+            // Play idle animation in current direction
+            this.sprite.play(`${this.sprite.texture.key}_idle_${this.facing}`, true);
+        }
+    }
+
+    private decideNewMovement(): void {
+        // Random number between 2 and 5 seconds
+        this.moveTimer = Phaser.Math.Between(2000, 5000);
+
+        // 30% chance to stay idle
+        if (Phaser.Math.Between(1, 100) <= 30) {
+            this.currentVelocity.x = 0;
+            this.currentVelocity.y = 0;
+            return;
+        }
+
+        // Random angle
+        const angle = Phaser.Math.DegToRad(Phaser.Math.Between(0, 360));
+        this.currentVelocity.x = Math.cos(angle) * this.walkSpeed;
+        this.currentVelocity.y = Math.sin(angle) * this.walkSpeed;
     }
 
     public isPlayerInRange(player: Phaser.Physics.Arcade.Sprite): boolean {

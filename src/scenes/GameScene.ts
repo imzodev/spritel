@@ -595,6 +595,51 @@ export default class GameScene extends Phaser.Scene {
                 repeat: -1,
                 yoyo: true
             });
+
+            // Walking animations
+            // Down
+            this.anims.create({
+                key: 'npc_1_walk_down',
+                frames: this.anims.generateFrameNumbers('npc_1', { 
+                    start: 10 * 24, // Row 10 (walk down)
+                    end: 10 * 24 + 8
+                }),
+                frameRate: 8,
+                repeat: -1
+            });
+
+            // Up
+            this.anims.create({
+                key: 'npc_1_walk_up',
+                frames: this.anims.generateFrameNumbers('npc_1', { 
+                    start: 8 * 24, // Row 8 (walk up)
+                    end: 8 * 24 + 8
+                }),
+                frameRate: 8,
+                repeat: -1
+            });
+
+            // Left
+            this.anims.create({
+                key: 'npc_1_walk_left',
+                frames: this.anims.generateFrameNumbers('npc_1', { 
+                    start: 9 * 24, // Row 9 (walk left)
+                    end: 9 * 24 + 8
+                }),
+                frameRate: 8,
+                repeat: -1
+            });
+
+            // Right
+            this.anims.create({
+                key: 'npc_1_walk_right',
+                frames: this.anims.generateFrameNumbers('npc_1', { 
+                    start: 11 * 24, // Row 11 (walk right)
+                    end: 11 * 24 + 8
+                }),
+                frameRate: 8,
+                repeat: -1
+            });
         }
     }
 
