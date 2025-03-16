@@ -78,58 +78,20 @@ export class NPC {
         // Update interaction zone position to follow NPC
         this.interactionZone.setPosition(this.sprite.x, this.sprite.y);
 
-        // Don't move if talking or busy
-        if (this.state === 'talking' || this.state === 'busy') {
-            this.sprite.setVelocity(0, 0);
-            this.playAnimation('idle');
-            return;
-        }
-
-        // Decrease move timer
-        this.moveTimer -= this.scene.game.loop.delta;
-
-        // Time to change direction or stop/start moving
-        if (this.moveTimer <= 0) {
-            this.decideNewMovement();
-        }
-
-        // Check if NPC has wandered too far from home
-        const distanceFromHome = Phaser.Math.Distance.Between(
-            this.sprite.x, this.sprite.y,
-            this.homePosition.x, this.homePosition.y
-        );
-
-        if (distanceFromHome > this.wanderRadius) {
-            // Calculate direction to home
-            const dx = this.homePosition.x - this.sprite.x;
-            const dy = this.homePosition.y - this.sprite.y;
-            
-            // Reset current velocity
-            this.currentVelocity.x = 0;
-            this.currentVelocity.y = 0;
-
-            // Choose either horizontal or vertical movement, not both
-            if (Math.abs(dx) > Math.abs(dy)) {
-                // Move horizontally
-                this.currentVelocity.x = dx > 0 ? this.walkSpeed : -this.walkSpeed;
-                this.setFacing(dx > 0 ? 'right' : 'left');
-            } else {
-                // Move vertically
-                this.currentVelocity.y = dy > 0 ? this.walkSpeed : -this.walkSpeed;
-                this.setFacing(dy > 0 ? 'down' : 'up');
-            }
-        }
-
-        // Apply velocity
-        this.sprite.setVelocity(this.currentVelocity.x, this.currentVelocity.y);
-
-        // Update state and animation
-        if (this.currentVelocity.x !== 0 || this.currentVelocity.y !== 0) {
-            this.state = 'walking';
+        // Update animation based on current state and facing
+        if (this.state === 'walking') {
             this.playAnimation('walk');
         } else {
-            this.state = 'idle';
             this.playAnimation('idle');
+        }
+    }
+
+    public updateFromNetwork(data: any): void {
+        // Only update if NPC is in current map
+        if (this.shouldBeVisible(data.mapCoordinates)) {
+            this.sprite.setPosition(data.x, data.y);
+            this.setState(data.state as 'idle' | 'walking' | 'talking' | 'busy');
+            this.setFacing(data.facing as 'up' | 'down' | 'left' | 'right');
         }
     }
 

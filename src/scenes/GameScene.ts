@@ -21,6 +21,7 @@ export default class GameScene extends Phaser.Scene {
     private initialized: boolean = false;
     private npcManager!: NPCManager;
     private interactKey!: Phaser.Input.Keyboard.Key;
+    private colliders: Phaser.Physics.Arcade.Collider[] = [];
 
     constructor() {
         super({ key: "GameScene" });
@@ -167,8 +168,11 @@ export default class GameScene extends Phaser.Scene {
         newLayer: Phaser.Tilemaps.TilemapLayer | null
     ): void {
         // First, clean up existing collision
-        this.destroyCurrentLayers();
-
+        if (this.playerCollider) {
+            this.physics.world.removeCollider(this.playerCollider);
+            this.playerCollider = null;
+        }
+        
         // If we're just clearing the collision (newLayer is null), return early
         if (!newLayer) {
             this.collisionLayer = null;
@@ -185,7 +189,8 @@ export default class GameScene extends Phaser.Scene {
             newLayer.setCollisionByExclusion([-1, 0]);
             this.collisionLayer = newLayer;
 
-            if (this.player && !this.isTransitioning) {
+            // Only add collider if we're not transitioning and have a valid player
+            if (this.player && !this.isTransitioning && newLayer.tilemap) {
                 this.playerCollider = this.physics.add.collider(
                     this.player.getSprite(),
                     newLayer
@@ -222,7 +227,15 @@ export default class GameScene extends Phaser.Scene {
 
     public startMapTransition(): void {
         this.isTransitioning = true;
-        this.destroyCurrentLayers();
+        
+        // Remove all colliders first
+        if (this.playerCollider) {
+            this.physics.world.removeCollider(this.playerCollider);
+            this.playerCollider = null;
+        }
+        
+        // Clear collision layer
+        this.setCollisionLayer(null);
         
         // Clear all other players' sprites and physics bodies
         this.otherPlayers.forEach(sprite => sprite.destroy());
@@ -232,14 +245,42 @@ export default class GameScene extends Phaser.Scene {
     }
 
     public endMapTransition(): void {
-        this.isTransitioning = false;
-        // Recreate collider if we have both player and collision layer
-        if (this.player && this.collisionLayer) {
-            this.playerCollider = this.physics.add.collider(
-                this.player.getSprite(),
-                this.collisionLayer
-            );
+        // Make sure we have both player and collision layer before creating collider
+        if (this.player && this.collisionLayer && this.collisionLayer.tilemap) {
+            try {
+                this.playerCollider = this.physics.add.collider(
+                    this.player.getSprite(),
+                    this.collisionLayer
+                );
+            } catch (error) {
+                console.error("Failed to create player collider:", error);
+            }
         }
+        
+        // Recreate NPCs for the new map
+        const currentMapData = this.mapManager.getCurrentMap();
+        if (currentMapData) {
+            const [_, currentX, currentY] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
+            const mapPosition = { 
+                x: parseInt(currentX), 
+                y: parseInt(currentY) 
+            };
+            
+            // Recreate merchant NPC if we're in map (0,0)
+            if (mapPosition.x === 0 && mapPosition.y === 0) {
+                this.npcManager.createNPC('merchant', {
+                    x: 100, // You might want to adjust these coordinates
+                    y: 100,
+                    texture: 'npc_1',
+                    scale: 0.5,
+                    interactionRadius: 50,
+                    defaultAnimation: 'npc_1_idle_down',
+                    mapCoordinates: { x: 0, y: 0 }
+                });
+            }
+        }
+        
+        this.isTransitioning = false;
         // Send updated position to network after transition
         this.networkManager.updatePlayerState(this.player);
     }
@@ -396,6 +437,30 @@ export default class GameScene extends Phaser.Scene {
                 this.otherPlayersPhysics.delete(data.playerId);
             }
         });
+
+        this.networkManager.on('initial-npc-states', (data) => {
+            data.npcs.forEach(npcData => {
+                // Only create if NPC doesn't exist
+                if (!this.npcManager.getNPC(npcData.id)) {
+                    this.npcManager.createNPC(npcData.id, {
+                        x: npcData.x,
+                        y: npcData.y,
+                        texture: 'npc_1',
+                        scale: 0.5,
+                        interactionRadius: 50,
+                        defaultAnimation: 'npc_1_idle_down',
+                        mapCoordinates: npcData.mapCoordinates
+                    });
+                }
+            });
+        });
+
+        this.networkManager.on('npc-update', (data) => {
+            const npc = this.npcManager.getNPC(data.npc.id);
+            if (npc) {
+                npc.updateFromNetwork(data.npc);
+            }
+        });
     }
 
     public getPlayer(): Player {
@@ -404,6 +469,14 @@ export default class GameScene extends Phaser.Scene {
 
     public getNetworkManager(): NetworkManager {
         return this.networkManager;
+    }
+
+    public getColliders(): Phaser.Physics.Arcade.Collider[] {
+        return this.colliders;
+    }
+
+    public getNPCManager(): NPCManager {
+        return this.npcManager;
     }
 
     private handlePlayerUpdate(playerData: any, source: string): void {

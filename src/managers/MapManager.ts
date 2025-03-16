@@ -117,11 +117,26 @@ export class MapManager {
     private destroyCurrentMap(): void {
         // Clear collision layer first
         const gameScene = this.scene as GameScene;
+        
+        // Clear NPCs before destroying the map
+        const npcManager = gameScene.getNPCManager();
+        if (npcManager) {
+            npcManager.clearNPCsForTransition();
+        }
+        
         gameScene.setCollisionLayer(null);
+
+        // Destroy all colliders first
+        if (gameScene.getColliders()) {
+            gameScene.getColliders().forEach(collider => {
+                if (collider) collider.destroy();
+            });
+        }
 
         // Then destroy the layers
         Object.values(this.currentLayers).forEach((layer) => {
             if (layer) {
+                layer.setCollisionByProperty({ collides: true }, false); // Disable collisions
                 layer.destroy();
             }
         });
@@ -274,10 +289,7 @@ export class MapManager {
                 direction
             );
 
-            // Clear old map
-            this.destroyCurrentMap();
-
-            // Update position and create new map
+            // Update position before destroying the map
             this.currentPosition = newPosition;
 
             // Update the player's map position BEFORE creating the new map
@@ -287,6 +299,10 @@ export class MapManager {
                 gameScene.getNetworkManager().updatePlayerState(playerEntity);
             }
 
+            // Clear old map after updating positions
+            this.destroyCurrentMap();
+
+            // Create new map and wait for it to complete
             await this.createMap();
 
             // Preload adjacent maps for the new position

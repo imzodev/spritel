@@ -18,6 +18,25 @@ const state: GameState = {
 
 const connectedClients = new Set<any>();
 
+const npcStates = new Map<string, {
+  id: string,
+  x: number,
+  y: number,
+  mapCoordinates: { x: number, y: number },
+  state: string,
+  facing: string
+}>();
+
+// Initialize default NPCs
+npcStates.set('merchant', {
+  id: 'merchant',
+  x: 100, // Set fixed spawn position
+  y: 100,
+  mapCoordinates: { x: 0, y: 0 },
+  state: 'idle',
+  facing: 'down'
+});
+
 function logGameState() {
   console.log('\n=== Current Game State ===');
   console.log('Connected players:', state.players.size);
@@ -62,6 +81,12 @@ const server = Bun.serve<{ id: string }>({
       ws.send(JSON.stringify({
         type: "game-state",
         players: Array.from(state.players.values()),
+      }));
+
+      // Send initial NPC states to new player
+      ws.send(JSON.stringify({
+        type: 'initial-npc-states',
+        npcs: Array.from(npcStates.values())
       }));
 
       // Then broadcast new player to others
@@ -184,3 +209,13 @@ function broadcast(
 }
 
 console.log(`WebSocket server running on port ${server.port}`);
+
+setInterval(() => {
+  npcStates.forEach((npc) => {
+    // Broadcast NPC updates to all clients in the same map
+    broadcast({
+      type: 'npc-update',
+      npc
+    }, null, npc.mapCoordinates);
+  });
+}, 100); // Update every 100ms
