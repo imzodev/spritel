@@ -298,9 +298,11 @@ export class MapManager {
             // Update player position
             player.setPosition(newPlayerPos.x, newPlayerPos.y);
 
-            // Restore other players and NPCs in their relative positions
+            // Restore other players in their relative positions
             gameScene.restoreOtherPlayers(playersData, direction);
-            gameScene.restoreNPCs(newPosition);
+            
+            // Request fresh NPC states from server
+            gameScene.getNetworkManager().requestNPCStates(newPosition);
         } catch (error) {
             console.error("[MapManager] Map transition failed:", error);
             this.bouncePlayer(player, direction);

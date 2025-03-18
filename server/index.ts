@@ -8,6 +8,20 @@ interface Player {
   mapPosition: { x: number; y: number };
 }
 
+interface NPCState {
+  id: string;
+  x: number;
+  y: number;
+  texture: string;
+  scale: number;
+  interactionRadius: number;
+  defaultAnimation: string;
+  mapCoordinates: { x: number; y: number };
+  state: 'idle' | 'walking' | 'talking' | 'busy';
+  facing: 'up' | 'down' | 'left' | 'right';
+  currentVelocity: { x: number; y: number };
+}
+
 interface GameState {
   players: Map<string, Player>;
 }
@@ -18,24 +32,29 @@ const state: GameState = {
 
 const connectedClients = new Set<any>();
 
-const npcStates = new Map<string, {
-  id: string,
-  x: number,
-  y: number,
-  mapCoordinates: { x: number, y: number },
-  state: string,
-  facing: string
-}>();
+const npcStates = new Map<string, NPCState>();
 
-// Initialize default NPCs
-npcStates.set('merchant', {
-  id: 'merchant',
-  x: 200, // Changed from 100 to match client-side spawn
-  y: 100,
-  mapCoordinates: { x: 0, y: 0 },
-  state: 'idle',
-  facing: 'down'
-});
+// Initialize default NPCs with complete configuration
+function initializeNPCs() {
+  npcStates.set('merchant', {
+    id: 'merchant',
+    x: 200,
+    y: 100,
+    texture: 'npc_1',
+    scale: 0.5,
+    interactionRadius: 50,
+    defaultAnimation: 'npc_1_idle_down',
+    mapCoordinates: { x: 0, y: 0 },
+    state: 'idle',
+    facing: 'down',
+    currentVelocity: { x: 0, y: 0 }
+  });
+
+  // Add more NPCs here as needed
+}
+
+// Call this when server starts
+initializeNPCs();
 
 function logGameState() {
   console.log('\n=== Current Game State ===');
@@ -152,6 +171,20 @@ const server = Bun.serve<{ id: string }>({
             position: data.position 
           }, ws);
           break;
+        case "request-npc-states":
+          const mapPosition = data.mapPosition;
+          // Filter NPCs for the requested map
+          const mapNPCs = Array.from(npcStates.values())
+            .filter(npc => 
+              npc.mapCoordinates.x === mapPosition.x && 
+              npc.mapCoordinates.y === mapPosition.y
+            );
+          
+          ws.send(JSON.stringify({
+            type: "initial-npc-states",
+            npcs: mapNPCs
+          }));
+          break;
       }
     },
     close(ws) {
@@ -210,12 +243,50 @@ function broadcast(
 
 console.log(`WebSocket server running on port ${server.port}`);
 
+// Add NPC movement/behavior update loop
 setInterval(() => {
   npcStates.forEach((npc) => {
+    // Update NPC state based on behavior (random movement, etc.)
+    if (npc.state === 'walking') {
+      npc.x += npc.currentVelocity.x;
+      npc.y += npc.currentVelocity.y;
+      
+      // Random direction change
+      if (Math.random() < 0.02) { // 2% chance per update
+        npc.currentVelocity = {
+          x: (Math.random() - 0.5) * 2,
+          y: (Math.random() - 0.5) * 2
+        };
+        npc.facing = determineNPCFacing(npc.currentVelocity);
+      }
+    } else if (Math.random() < 0.01) { // 1% chance to start walking
+      npc.state = 'walking';
+      npc.currentVelocity = {
+        x: (Math.random() - 0.5) * 2,
+        y: (Math.random() - 0.5) * 2
+      };
+      npc.facing = determineNPCFacing(npc.currentVelocity);
+    }
+
     // Broadcast NPC updates to all clients in the same map
     broadcast({
       type: 'npc-update',
-      npc
+      npc: {
+        id: npc.id,
+        x: npc.x,
+        y: npc.y,
+        state: npc.state,
+        facing: npc.facing,
+        mapCoordinates: npc.mapCoordinates
+      }
     }, null, npc.mapCoordinates);
   });
 }, 100); // Update every 100ms
+
+function determineNPCFacing(velocity: { x: number, y: number }): 'up' | 'down' | 'left' | 'right' {
+  if (Math.abs(velocity.x) > Math.abs(velocity.y)) {
+    return velocity.x > 0 ? 'right' : 'left';
+  } else {
+    return velocity.y > 0 ? 'down' : 'up';
+  }
+}

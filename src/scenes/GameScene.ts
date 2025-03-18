@@ -79,18 +79,11 @@ export default class GameScene extends Phaser.Scene {
         // First create the animations
         this.createNPCAnimations();
         
-        // Initialize NPCManager
+        // Initialize NPCManager (but don't create NPCs yet)
         this.npcManager = new NPCManager(this, this.player);
         
-        // Let restoreNPCs handle NPC creation based on current map position
-        const currentMapData = this.mapManager.getCurrentMap();
-        if (currentMapData) {
-            const [_, x, y] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
-            this.restoreNPCs({ 
-                x: parseInt(x), 
-                y: parseInt(y) 
-            });
-        }
+        // Remove local NPC creation - now handled by server
+        // Let network updates handle NPC creation and updates
 
         // Add interaction key
         if (this.input.keyboard) {
@@ -418,23 +411,15 @@ export default class GameScene extends Phaser.Scene {
         });
 
         this.networkManager.on('initial-npc-states', (data) => {
-            interface NPCData {
-                id: string;
-                x: number;
-                y: number;
-                mapCoordinates: { x: number; y: number };
-            }
-            data.npcs.forEach((npcData: NPCData) => {
-                // Only create if NPC doesn't exist
+            data.npcs.forEach((npcData: NPCState) => {
                 if (!this.npcManager.getNPC(npcData.id)) {
-                    const npcX = this.player.getSprite().x + 100;
                     this.npcManager.createNPC(npcData.id, {
-                        x: npcX, // Use local position instead of server position
-                        y: this.player.getSprite().y,
-                        texture: 'npc_1',
-                        scale: 0.5,
-                        interactionRadius: 50,
-                        defaultAnimation: 'npc_1_idle_down',
+                        x: npcData.x,
+                        y: npcData.y,
+                        texture: npcData.texture,
+                        scale: npcData.scale,
+                        interactionRadius: npcData.interactionRadius,
+                        defaultAnimation: npcData.defaultAnimation,
                         mapCoordinates: npcData.mapCoordinates
                     });
                 }

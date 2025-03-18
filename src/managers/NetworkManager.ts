@@ -83,4 +83,13 @@ export class NetworkManager extends EventTarget {
       }));
     }
   }
+
+  public requestNPCStates(mapPosition: { x: number, y: number }): void {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'request-npc-states',
+        mapPosition: mapPosition
+      }));
+    }
+  }
 }

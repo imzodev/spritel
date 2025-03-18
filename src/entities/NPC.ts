@@ -92,9 +92,21 @@ export class NPC {
     public updateFromNetwork(data: any): void {
         // Only update if NPC is in current map
         if (this.shouldBeVisible(data.mapCoordinates)) {
-            this.sprite.setPosition(data.x, data.y);
-            this.setState(data.state as 'idle' | 'walking' | 'talking' | 'busy');
-            this.setFacing(data.facing as 'up' | 'down' | 'left' | 'right');
+            // Smoothly interpolate position
+            const targetX = data.x;
+            const targetY = data.y;
+            
+            // Simple linear interpolation
+            const lerpFactor = 0.3; // Adjust for smoother/faster movement
+            this.sprite.x += (targetX - this.sprite.x) * lerpFactor;
+            this.sprite.y += (targetY - this.sprite.y) * lerpFactor;
+
+            // Update state and facing
+            this.setState(data.state);
+            this.setFacing(data.facing);
+
+            // Update animation based on state and facing
+            this.updateAnimation();
         }
     }
 
@@ -199,5 +211,16 @@ export class NPC {
     public shouldBeVisible(currentMapCoords: { x: number, y: number }): boolean {
         return this.mapCoordinates.x === currentMapCoords.x && 
                this.mapCoordinates.y === currentMapCoords.y;
+    }
+
+    private updateAnimation(): void {
+        const animationPrefix = 'npc_1_';
+        const statePrefix = this.state === 'walking' ? 'walk_' : 'idle_';
+        const newAnimation = animationPrefix + statePrefix + this.facing;
+
+        if (this.currentAnimation !== newAnimation) {
+            this.sprite.play(newAnimation, true);
+            this.currentAnimation = newAnimation;
+        }
     }
 }
