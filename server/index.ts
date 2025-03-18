@@ -32,11 +32,34 @@ const state: GameState = {
 
 const connectedClients = new Set<any>();
 
-const npcStates = new Map<string, NPCState>();
+// Map structure to store NPCs by map coordinates
+const npcStatesByMap = new Map<string, Set<string>>();  // Map<"x,y", Set<npcId>>
+const npcStates = new Map<string, NPCState>();         // Map<npcId, NPCState>
+
+function getMapKey(x: number, y: number): string {
+  return `${x},${y}`;
+}
+
+// When adding/updating an NPC's position
+function updateNPCPosition(npcId: string, npc: NPCState, oldMapCoords?: { x: number, y: number }) {
+  // Remove from old map position if it exists
+  if (oldMapCoords) {
+    const oldMapKey = getMapKey(oldMapCoords.x, oldMapCoords.y);
+    npcStatesByMap.get(oldMapKey)?.delete(npcId);
+  }
+
+  // Add to new map position
+  const mapKey = getMapKey(npc.mapCoordinates.x, npc.mapCoordinates.y);
+  if (!npcStatesByMap.has(mapKey)) {
+    npcStatesByMap.set(mapKey, new Set());
+  }
+  npcStatesByMap.get(mapKey)!.add(npcId);
+  npcStates.set(npcId, npc);
+}
 
 // Initialize default NPCs with complete configuration
 function initializeNPCs() {
-  npcStates.set('merchant', {
+  const merchant: NPCState = {
     id: 'merchant',
     x: 200,
     y: 100,
@@ -48,7 +71,8 @@ function initializeNPCs() {
     state: 'idle',
     facing: 'down',
     currentVelocity: { x: 0, y: 0 }
-  });
+  };
+  updateNPCPosition('merchant', merchant);
 
   // Add more NPCs here as needed
 }
@@ -171,20 +195,19 @@ const server = Bun.serve<{ id: string }>({
             position: data.position 
           }, ws);
           break;
-        case "request-npc-states":
-          const mapPosition = data.mapPosition;
-          // Filter NPCs for the requested map
-          const mapNPCs = Array.from(npcStates.values())
-            .filter(npc => 
-              npc.mapCoordinates.x === mapPosition.x && 
-              npc.mapCoordinates.y === mapPosition.y
-            );
+        case "request-npc-states": {
+          const { mapPosition } = data;
+          const mapKey = getMapKey(mapPosition.x, mapPosition.y);
+          const npcIds = npcStatesByMap.get(mapKey) || new Set();
+          
+          const mapNPCs = Array.from(npcIds).map(id => npcStates.get(id));
           
           ws.send(JSON.stringify({
             type: "initial-npc-states",
             npcs: mapNPCs
           }));
           break;
+        }
       }
     },
     close(ws) {
