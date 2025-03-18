@@ -82,28 +82,14 @@ export default class GameScene extends Phaser.Scene {
         // Initialize NPCManager
         this.npcManager = new NPCManager(this, this.player);
         
-        // Create merchant NPC - let's position it near the player for testing
-        const playerSprite = this.player.getSprite();
-        this.npcManager.createNPC('merchant', {
-            x: playerSprite.x + 100, // 100 pixels to the right of player
-            y: playerSprite.y,       // same y as player
-            texture: 'npc_1',
-            scale: 0.5,
-            interactionRadius: 50,
-            defaultAnimation: 'npc_1_idle_down',
-            mapCoordinates: { x: 0, y: 0 }  // Specify that this NPC belongs to map (0,0)
-        });
-
-        // Add debug logging
-        console.log('NPC created at:', playerSprite.x + 100, playerSprite.y);
-        const npc = this.npcManager.getNPC('merchant');
-        if (npc) {
-            const sprite = npc.getSprite();
-            console.log('NPC sprite exists:', !!sprite);
-            console.log('NPC sprite visible:', sprite.visible);
-            console.log('NPC sprite position:', sprite.x, sprite.y);
-            console.log('NPC sprite texture:', sprite.texture.key);
-            console.log('NPC sprite scale:', sprite.scale);
+        // Let restoreNPCs handle NPC creation based on current map position
+        const currentMapData = this.mapManager.getCurrentMap();
+        if (currentMapData) {
+            const [_, x, y] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
+            this.restoreNPCs({ 
+                x: parseInt(x), 
+                y: parseInt(y) 
+            });
         }
 
         // Add interaction key
@@ -331,8 +317,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     public restoreNPCs(mapPosition: { x: number, y: number }): void {
-        // Recreate NPCs for the new map position
-        if (mapPosition.x === 0 && mapPosition.y === 0) {
+        // First check if NPC already exists
+        if (mapPosition.x === 0 && mapPosition.y === 0 && !this.npcManager.getNPC('merchant')) {
             this.npcManager.createNPC('merchant', {
                 x: 100,
                 y: 100,
@@ -441,9 +427,10 @@ export default class GameScene extends Phaser.Scene {
             data.npcs.forEach((npcData: NPCData) => {
                 // Only create if NPC doesn't exist
                 if (!this.npcManager.getNPC(npcData.id)) {
+                    const npcX = this.player.getSprite().x + 100;
                     this.npcManager.createNPC(npcData.id, {
-                        x: npcData.x,
-                        y: npcData.y,
+                        x: npcX, // Use local position instead of server position
+                        y: this.player.getSprite().y,
                         texture: 'npc_1',
                         scale: 0.5,
                         interactionRadius: 50,

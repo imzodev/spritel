@@ -30,7 +30,7 @@ const npcStates = new Map<string, {
 // Initialize default NPCs
 npcStates.set('merchant', {
   id: 'merchant',
-  x: 100, // Set fixed spawn position
+  x: 200, // Changed from 100 to match client-side spawn
   y: 100,
   mapCoordinates: { x: 0, y: 0 },
   state: 'idle',
