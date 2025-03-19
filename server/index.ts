@@ -217,7 +217,7 @@ function chooseNewDirection(npc: NPCState): void {
 
   // If no directions are available (shouldn't happen with proper buffer), use all directions
   if (availableDirections.length === 0) {
-    availableDirections = directions;
+    availableDirections = [...directions];
   }
 
   // Choose random direction from available ones
