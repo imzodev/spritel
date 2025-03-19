@@ -80,7 +80,7 @@ export default class GameScene extends Phaser.Scene {
         this.createNPCAnimations();
         
         // Initialize NPCManager after player is created
-        this.npcManager = new NPCManager(this, this.player);
+        this.initializeNPCManager();
 
         // Add interaction key
         if (this.input.keyboard) {
@@ -451,6 +451,10 @@ export default class GameScene extends Phaser.Scene {
 
     public getNPCManager(): NPCManager {
         return this.npcManager;
+    }
+
+    private initializeNPCManager(): void {
+        this.npcManager = new NPCManager(this);
     }
 
     private handlePlayerUpdate(playerData: any, source: string): void {

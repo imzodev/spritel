@@ -32,6 +32,8 @@ export class NPC {
     private lastCollisionTime: number = 0;
     private collisionCooldown: number = 500; // 500ms cooldown between collision reports
     private colliders: Phaser.Physics.Arcade.Collider[] = [];
+    private readonly INTERPOLATION_SPEED = 0.3; // Adjust this value to change smoothing (0-1)
+    private targetPosition = { x: 0, y: 0 };
     
     constructor(scene: Phaser.Scene, config: NPCConfig) {
         this.scene = scene;
@@ -100,18 +102,28 @@ export class NPC {
         // Handle collisions before updating position
         this.handleCollisions();
 
-        // Update sprite velocity based on current movement
-        const body = this.sprite.body as Phaser.Physics.Arcade.Body;
         if (!this.isColliding) {
-            body.setVelocity(this.currentVelocity.x * this.walkSpeed, this.currentVelocity.y * this.walkSpeed);
+            // Smooth position interpolation
+            if (this.state === 'walking') {
+                const dx = this.targetPosition.x - this.sprite.x;
+                const dy = this.targetPosition.y - this.sprite.y;
+                
+                if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+                    this.sprite.x += dx * this.INTERPOLATION_SPEED;
+                    this.sprite.y += dy * this.INTERPOLATION_SPEED;
+                    
+                    // Update velocity for animation
+                    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+                    body.setVelocity(
+                        this.currentVelocity.x * this.walkSpeed,
+                        this.currentVelocity.y * this.walkSpeed
+                    );
+                }
+            }
         }
 
         // Update animation based on current state and facing
-        if (this.state === 'walking') {
-            this.playAnimation('walk');
-        } else {
-            this.playAnimation('idle');
-        }
+        this.updateAnimation();
     }
 
     private handleCollisions(): void {
@@ -160,39 +172,30 @@ export class NPC {
     public updateFromNetwork(data: any): void {
         // Only update if NPC is in current map
         if (this.shouldBeVisible(data.mapCoordinates)) {
-            const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+            // Update target position
+            this.targetPosition = { x: data.x, y: data.y };
             
-            // Don't update position if we're colliding
-            if (this.isColliding) {
-                // Stop all movement
-                body.setVelocity(0, 0);
-                this.currentVelocity = { x: 0, y: 0 };
-                return;
-            }
-
-            // Update state and facing
+            // Update state and facing immediately
             this.state = data.state;
             this.facing = data.facing;
-
-            // Update velocity
             this.currentVelocity = data.currentVelocity;
+
+            // If we're too far from target, snap to it
+            const distance = Phaser.Math.Distance.Between(
+                this.sprite.x, this.sprite.y,
+                this.targetPosition.x, this.targetPosition.y
+            );
             
-            // Only update position if not colliding
-            if (!body.blocked.up && !body.blocked.down && 
-                !body.blocked.left && !body.blocked.right) {
-                this.sprite.x = data.x;
-                this.sprite.y = data.y;
-                body.setVelocity(
-                    this.currentVelocity.x * this.walkSpeed,
-                    this.currentVelocity.y * this.walkSpeed
-                );
+            if (distance > 100) { // Threshold for snapping
+                this.sprite.x = this.targetPosition.x;
+                this.sprite.y = this.targetPosition.y;
             }
 
-            // Update animation based on state and facing
-            const animationKey = this.getAnimationKey();
-            if (this.currentAnimation !== animationKey) {
-                this.currentAnimation = animationKey;
-                this.sprite.play(animationKey);
+            // Handle collision state
+            if (this.isColliding) {
+                const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+                body.setVelocity(0, 0);
+                this.currentVelocity = { x: 0, y: 0 };
             }
         }
     }
@@ -301,13 +304,17 @@ export class NPC {
     }
 
     private updateAnimation(): void {
-        const animationPrefix = 'npc_1_';
-        const statePrefix = this.state === 'walking' ? 'walk_' : 'idle_';
-        const newAnimation = animationPrefix + statePrefix + this.facing;
-
-        if (this.currentAnimation !== newAnimation) {
-            this.sprite.play(newAnimation, true);
-            this.currentAnimation = newAnimation;
+        const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+        const isMoving = Math.abs(body.velocity.x) > 0.1 || Math.abs(body.velocity.y) > 0.1;
+        
+        // Determine animation state
+        const animState = isMoving ? 'walk' : 'idle';
+        const animationKey = `npc_1_${animState}_${this.facing}`;
+        
+        // Only change animation if it's different
+        if (this.currentAnimation !== animationKey) {
+            this.currentAnimation = animationKey;
+            this.sprite.play(animationKey, true);
         }
     }
 

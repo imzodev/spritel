@@ -120,8 +120,10 @@ export class MapManager {
         
         // Clear NPCs before destroying the map
         const npcManager = gameScene.getNPCManager();
-        if (npcManager) {
-            npcManager.clearNPCsForTransition();
+        if (npcManager && typeof npcManager.clearAllNPCs === 'function') {
+            npcManager.clearAllNPCs();
+        } else {
+            console.warn('[MapManager] NPCManager not properly initialized');
         }
         
         gameScene.setCollisionLayer(null);

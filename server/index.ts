@@ -335,13 +335,13 @@ function getFacingFromVelocity(velocity: { x: number, y: number }): 'up' | 'down
   }
 }
 
-// Update the movement interval to respect collision state
+// Update the movement interval for smoother updates
 setInterval(() => {
   npcStates.forEach((npc, npcId) => {
     if (!npc.isColliding && npc.state === 'walking') {
-      // Move the NPC
-      npc.x += npc.currentVelocity.x * 2;
-      npc.y += npc.currentVelocity.y * 2;
+      // Move the NPC with smaller increments
+      npc.x += npc.currentVelocity.x * 1; // Reduced from 2 to 1
+      npc.y += npc.currentVelocity.y * 1;
       
       // Broadcast update
       broadcast({
@@ -350,4 +350,4 @@ setInterval(() => {
       });
     }
   });
-}, 100); // Update every 100ms
+}, 50); // Updated from 100ms to 50ms for more frequent updates
