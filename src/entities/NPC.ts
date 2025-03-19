@@ -28,7 +28,7 @@ export interface NPCConfig {
 }
 
 export class NPC {
-    private scene: Phaser.Scene;
+    private scene: GameScene;
     private sprite: Phaser.Physics.Arcade.Sprite;
     private config: NPCConfig;
     private isMoving: boolean = false;
@@ -47,7 +47,7 @@ export class NPC {
     private movementProgress: number = 0;
     private homePosition: { x: number, y: number };
 
-    constructor(scene: Phaser.Scene, config: NPCConfig) {
+    constructor(scene: GameScene, config: NPCConfig) {
         console.log('[NPC] Initializing NPC:', config.id, {
             position: { x: config.x, y: config.y },
             texture: config.texture
@@ -70,7 +70,7 @@ export class NPC {
         
         // Listen for movement instructions from NetworkManager instead of game events
         console.log('[NPC] Setting up movement instruction listener');
-        this.scene.networkManager.on('npc-movement-instruction', (data: any) => {
+        this.scene.getNetworkManager().on('npc-movement-instruction', (data: any) => {
             if (data.npcId === this.config.id) {
                 this.handleMovementInstruction(data);
             }
@@ -334,7 +334,7 @@ export class NPC {
 
     public destroy(): void {
         // Remove the event listener
-        this.scene.networkManager.off('npc-movement-instruction', this.handleMovementInstruction);
+        this.scene.getNetworkManager().off('npc-movement-instruction', this.handleMovementInstruction);
         
         // Remove all colliders if they exist
         if (this.colliders && Array.isArray(this.colliders)) {

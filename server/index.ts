@@ -1,4 +1,5 @@
 import { Server } from "bun";
+import { NPCState, TilePosition, NPCMovementState } from '../src/types/npc';
 
 // Constants for tile-based calculations
 const TILE_SIZE = 16; // Size of each tile in pixels
@@ -10,24 +11,12 @@ const NPC_BUFFER_TILES = 2; // Keep NPCs 2 tiles away from edges
 const MAP_WIDTH = MAP_WIDTH_TILES * TILE_SIZE;
 const MAP_HEIGHT = MAP_HEIGHT_TILES * TILE_SIZE;
 
-interface TilePosition {
-  tileX: number;
-  tileY: number;
-}
-
-// Helper functions for conversion
+// Remove only the duplicate interface declarations, keep the functions
 function pixelsToTiles(x: number, y: number): TilePosition {
-  return {
-    tileX: Math.floor(x / TILE_SIZE),
-    tileY: Math.floor(y / TILE_SIZE)
-  };
-}
-
-function tilesToPixels(tileX: number, tileY: number): { x: number, y: number } {
-  return {
-    x: (tileX * TILE_SIZE) + (TILE_SIZE / 2), // Center of tile
-    y: (tileY * TILE_SIZE) + (TILE_SIZE / 2)  // Center of tile
-  };
+    return {
+        tileX: Math.floor(x / TILE_SIZE),
+        tileY: Math.floor(y / TILE_SIZE)
+    };
 }
 
 interface Player {
@@ -36,31 +25,6 @@ interface Player {
   y: number;
   animation: string;
   mapPosition: { x: number; y: number };
-}
-
-interface NPCMovementState {
-  currentPath: Array<TilePosition>;  // Current path of tiles to traverse
-  currentTileIndex: number;          // Current position in path
-  isMoving: boolean;                 // Whether NPC is currently moving
-  targetTile: TilePosition | null;   // Next tile to move to
-}
-
-interface NPCState {
-  id: string;
-  x: number;
-  y: number;
-  texture: string;
-  scale: number;
-  interactionRadius: number;
-  defaultAnimation: string;
-  mapCoordinates: { x: number; y: number };
-  state: 'idle' | 'walking' | 'talking' | 'busy';
-  facing: 'up' | 'down' | 'left' | 'right';
-  currentVelocity: { x: number; y: number };
-  isColliding: boolean;
-  lastCollisionTime: number;
-  movementState: NPCMovementState;
-  currentTile: TilePosition;         // Current tile position
 }
 
 interface GameState {

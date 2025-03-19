@@ -3,6 +3,7 @@ import { MapManager } from "../managers/MapManager";
 import { Player } from "../entities/Player";
 import { NetworkManager } from "../managers/NetworkManager";
 import { NPCManager } from "../managers/NPCManager";
+import { NPCState } from '../types/npc';
 
 export default class GameScene extends Phaser.Scene {
     private player!: Player;
