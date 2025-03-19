@@ -20,6 +20,8 @@ interface NPCState {
   state: 'idle' | 'walking' | 'talking' | 'busy';
   facing: 'up' | 'down' | 'left' | 'right';
   currentVelocity: { x: number; y: number };
+  isColliding: boolean;
+  lastCollisionTime: number;
 }
 
 interface GameState {
@@ -62,15 +64,17 @@ function initializeNPCs() {
   const merchant: NPCState = {
     id: 'merchant',
     x: 200,
-    y: 100,
+    y: 70,
     texture: 'npc_1',
     scale: 0.5,
     interactionRadius: 50,
     defaultAnimation: 'npc_1_idle_down',
     mapCoordinates: { x: 0, y: 0 },
-    state: 'idle',
+    state: 'walking',
     facing: 'down',
-    currentVelocity: { x: 0, y: 0 }
+    currentVelocity: { x: 0, y: 1 },
+    isColliding: false,
+    lastCollisionTime: 0
   };
   updateNPCPosition('merchant', merchant);
 
@@ -208,6 +212,9 @@ const server = Bun.serve<{ id: string }>({
           }));
           break;
         }
+        case "npc-collision":
+          handleNPCCollision(data.npcId, data.collision);
+          break;
       }
     },
     close(ws) {
@@ -266,84 +273,81 @@ function broadcast(
 
 console.log(`WebSocket server running on port ${server.port}`);
 
-// Add NPC movement/behavior update loop
-setInterval(() => {
-  npcStates.forEach((npc) => {
-    // Update NPC state based on behavior (random movement, etc.)
-    if (npc.state === 'walking') {
-      npc.x += npc.currentVelocity.x;
-      npc.y += npc.currentVelocity.y;
-      
-      // Random direction change
-      if (Math.random() < 0.02) { // 2% chance per update
-        // Choose a random cardinal direction (0: up, 1: right, 2: down, 3: left)
-        const direction = Math.floor(Math.random() * 4);
-        const speed = 1; // Base movement speed
-        
-        // Reset velocities and set new direction
-        npc.currentVelocity = { x: 0, y: 0 };
-        
-        switch (direction) {
-          case 0: // up
-            npc.currentVelocity.y = -speed;
-            npc.facing = 'up';
-            break;
-          case 1: // right
-            npc.currentVelocity.x = speed;
-            npc.facing = 'right';
-            break;
-          case 2: // down
-            npc.currentVelocity.y = speed;
-            npc.facing = 'down';
-            break;
-          case 3: // left
-            npc.currentVelocity.x = -speed;
-            npc.facing = 'left';
-            break;
-        }
-      }
-    } else if (Math.random() < 0.01) { // 1% chance to start walking
-      // Choose a random cardinal direction (0: up, 1: right, 2: down, 3: left)
-      const direction = Math.floor(Math.random() * 4);
-      const speed = 1; // Base movement speed
-      
-      npc.state = 'walking';
-      npc.currentVelocity = { x: 0, y: 0 }; // Reset velocity
-      
-      switch (direction) {
-        case 0: // up
-          npc.currentVelocity.y = -speed;
-          npc.facing = 'up';
-          break;
-        case 1: // right
-          npc.currentVelocity.x = speed;
-          npc.facing = 'right';
-          break;
-        case 2: // down
-          npc.currentVelocity.y = speed;
-          npc.facing = 'down';
-          break;
-        case 3: // left
-          npc.currentVelocity.x = -speed;
-          npc.facing = 'left';
-          break;
-      }
-    }
+function handleNPCCollision(npcId: string, collision: any) {
+  const npc = npcStates.get(npcId);
+  if (!npc) return;
 
-    // Broadcast NPC updates to all clients in the same map
-    broadcast({
-      type: 'npc-update',
-      npc: {
-        id: npc.id,
-        x: npc.x,
-        y: npc.y,
-        state: npc.state,
-        facing: npc.facing,
-        mapCoordinates: npc.mapCoordinates
-      }
-    }, null, npc.mapCoordinates);
+  console.log(`[Server] NPC ${npcId} collision:`, collision);
+  
+  // Immediately stop the NPC
+  npc.isColliding = true;
+  npc.lastCollisionTime = Date.now();
+  npc.currentVelocity = { x: 0, y: 0 };
+  npc.state = 'idle';
+
+  // Broadcast the stopped state immediately
+  broadcast({
+    type: 'npc-update',
+    npc: npc
+  });
+
+  // Wait before trying to move again
+  setTimeout(() => {
+    if (!npc) return;
+    
+    // Reset collision state
+    npc.isColliding = false;
+    
+    // Choose a new direction avoiding the collision
+    const possibleDirections = [
+      { x: 0, y: 1 },   // down
+      { x: 0, y: -1 },  // up
+      { x: 1, y: 0 },   // right
+      { x: -1, y: 0 }   // left
+    ].filter(dir => {
+      if (collision.up && dir.y < 0) return false;
+      if (collision.down && dir.y > 0) return false;
+      if (collision.left && dir.x < 0) return false;
+      if (collision.right && dir.x > 0) return false;
+      return true;
+    });
+
+    if (possibleDirections.length > 0) {
+      const newDir = possibleDirections[Math.floor(Math.random() * possibleDirections.length)];
+      npc.currentVelocity = newDir;
+      npc.state = 'walking';
+      npc.facing = getFacingFromVelocity(newDir);
+      
+      // Broadcast the new movement state
+      broadcast({
+        type: 'npc-update',
+        npc: npc
+      });
+    }
+  }, 2000); // Wait 2 seconds before trying to move again
+}
+
+function getFacingFromVelocity(velocity: { x: number, y: number }): 'up' | 'down' | 'left' | 'right' {
+  if (Math.abs(velocity.x) > Math.abs(velocity.y)) {
+    return velocity.x > 0 ? 'right' : 'left';
+  } else {
+    return velocity.y > 0 ? 'down' : 'up';
+  }
+}
+
+// Update the movement interval to respect collision state
+setInterval(() => {
+  npcStates.forEach((npc, npcId) => {
+    if (!npc.isColliding && npc.state === 'walking') {
+      // Move the NPC
+      npc.x += npc.currentVelocity.x * 2;
+      npc.y += npc.currentVelocity.y * 2;
+      
+      // Broadcast update
+      broadcast({
+        type: 'npc-update',
+        npc: npc
+      });
+    }
   });
 }, 100); // Update every 100ms
-
-// The determineNPCFacing function has been removed as it's no longer needed
-// The facing direction is now set directly when choosing movement direction

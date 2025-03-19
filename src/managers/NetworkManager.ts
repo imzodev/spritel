@@ -92,4 +92,17 @@ export class NetworkManager extends EventTarget {
       }));
     }
   }
+
+  public sendNPCCollision(npcId: string, collision: any): void {
+    console.log('[NetworkManager] Sending NPC collision:', { npcId, collision }); // Debug log
+    if (this.ws.readyState === WebSocket.OPEN) {
+      const message = {
+        type: 'npc-collision',
+        npcId,
+        collision
+      };
+      console.log('[NetworkManager] Sending message:', message); // Debug log
+      this.ws.send(JSON.stringify(message));
+    }
+  }
 }

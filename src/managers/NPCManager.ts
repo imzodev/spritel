@@ -1,86 +1,107 @@
 import { NPC, NPCConfig } from "../entities/NPC";
 import { Player } from "../entities/Player";
+import { GameScene } from "../scenes/GameScene";
 
 export class NPCManager {
+    private scene: GameScene;
     private npcs: Map<string, NPC> = new Map();
-    private scene: Phaser.Scene;
-    private player: Player;
     private collisionLayer: Phaser.Tilemaps.TilemapLayer | null = null;
+    private player: Player;
 
-    constructor(scene: Phaser.Scene, player: Player) {
+    constructor(scene: GameScene, player: Player) {
         this.scene = scene;
         this.player = player;
     }
 
+    public setCollisionLayer(layer: Phaser.Tilemaps.TilemapLayer): void {
+        console.log('[NPCManager] Setting collision layer');
+        this.collisionLayer = layer;
+        
+        // Reconfigure collisions for all existing NPCs
+        this.npcs.forEach(npc => {
+            console.log('[NPCManager] Reconfiguring collision for NPC:', npc.getId());
+            this.setupNPCCollision(npc);
+        });
+    }
+
+    private setupNPCCollision(npc: NPC): void {
+        if (!this.collisionLayer) {
+            console.warn('[NPCManager] No collision layer available for NPC:', npc.getId());
+            return;
+        }
+
+        console.log('[NPCManager] Setting up collision for NPC:', npc.getId());
+        
+        // Get the sprite and ensure it has a physics body
+        const sprite = npc.getSprite();
+        const body = sprite.body as Phaser.Physics.Arcade.Body;
+        
+        if (!body) {
+            console.error('[NPCManager] NPC sprite has no physics body:', npc.getId());
+            return;
+        }
+
+        // Configure physics body
+        body.setCollideWorldBounds(true);
+        body.setImmovable(true);
+        
+        // Add collider with the map
+        const mapCollider = this.scene.physics.add.collider(
+            sprite,
+            this.collisionLayer,
+            () => {
+                console.log('[NPCManager] NPC collided with map:', npc.getId());
+                // Stop the NPC's movement when colliding
+                body.setVelocity(0, 0);
+            }
+        );
+
+        // Add collider with the player
+        const playerCollider = this.scene.physics.add.collider(
+            sprite,
+            this.player.getSprite(),
+            () => {
+                console.log('[NPCManager] NPC collided with player:', npc.getId());
+                // Stop the NPC's movement when colliding with player
+                body.setVelocity(0, 0);
+            }
+        );
+
+        // Store colliders in the NPC instance
+        npc.setColliders([mapCollider, playerCollider]);
+        
+        console.log('[NPCManager] Collision setup complete for NPC:', npc.getId());
+    }
+
     public createNPC(id: string, config: NPCConfig): NPC {
+        console.log('[NPCManager] Creating NPC:', id);
+        
         // Remove existing NPC if it exists
         const existingNPC = this.npcs.get(id);
         if (existingNPC) {
-            existingNPC.getSprite().destroy();
-            existingNPC.getInteractionZone().destroy();
+            console.log('[NPCManager] Removing existing NPC:', id);
+            existingNPC.destroy();
             this.npcs.delete(id);
         }
 
-        const npc = new NPC(this.scene, config);
+        const npcConfig = {
+            ...config,
+            id: id
+        };
+
+        const npc = new NPC(this.scene, npcConfig);
         this.npcs.set(id, npc);
 
-        // Only add collision if the NPC is on the current map
-        const currentMapCoords = this.player.getMapPosition();
-        if (npc.shouldBeVisible(currentMapCoords)) {
+        // Set up collision immediately if we have a collision layer
+        if (this.collisionLayer) {
             this.setupNPCCollision(npc);
         }
 
         return npc;
     }
 
-    private setupNPCCollision(npc: NPC): void {
-        if (this.collisionLayer) {
-            this.scene.physics.add.collider(npc.getSprite(), this.collisionLayer);
-        }
-        this.scene.physics.add.collider(npc.getSprite(), this.player.getSprite());
-    }
-
-    public clearNPCsForTransition(): void {
-        // Remove all colliders and destroy sprites
-        this.npcs.forEach(npc => {
-            if (this.scene.physics.world.colliders.getActive().length > 0) {
-                this.scene.physics.world.colliders.getActive().forEach(collider => {
-                    if (collider.object2 === npc.getSprite()) {
-                        collider.destroy();
-                    }
-                });
-            }
-            
-            npc.getSprite().destroy();
-            npc.getInteractionZone().destroy();
-        });
-        
-        this.npcs.clear();
-        this.collisionLayer = null;
-    }
-
-    public setCollisionLayer(layer: Phaser.Tilemaps.TilemapLayer | null): void {
-        this.collisionLayer = layer;
-        // Refresh collisions for all NPCs
-        if (layer) {
-            this.npcs.forEach(npc => {
-                this.setupNPCCollision(npc);
-            });
-        }
-    }
-
     public update(): void {
-        this.npcs.forEach(npc => {
-            npc.update();
-            
-            // Check for player interaction
-            if (npc.isPlayerInRange(this.player.getSprite())) {
-                // Visual feedback that NPC is interactable
-                npc.getInteractionZone().setVisible(true);
-            } else {
-                npc.getInteractionZone().setVisible(false);
-            }
-        });
+        this.npcs.forEach(npc => npc.update());
     }
 
     public getNPC(id: string): NPC | undefined {

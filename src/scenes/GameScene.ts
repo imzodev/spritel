@@ -79,11 +79,8 @@ export default class GameScene extends Phaser.Scene {
         // First create the animations
         this.createNPCAnimations();
         
-        // Initialize NPCManager (but don't create NPCs yet)
+        // Initialize NPCManager after player is created
         this.npcManager = new NPCManager(this, this.player);
-        
-        // Remove local NPC creation - now handled by server
-        // Let network updates handle NPC creation and updates
 
         // Add interaction key
         if (this.input.keyboard) {
@@ -93,6 +90,12 @@ export default class GameScene extends Phaser.Scene {
         } else {
             console.error("Keyboard input not available");
         }
+
+        // Listen for NPC collision events
+        this.game.events.on('npc-collision', (data: { npcId: string, collision: any }) => {
+            console.log('[GameScene] NPC collision detected:', data); // Debug log
+            this.networkManager.sendNPCCollision(data.npcId, data.collision);
+        });
     }
 
     private initializeControls(): void {

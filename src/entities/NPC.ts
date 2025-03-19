@@ -1,17 +1,19 @@
 import Phaser from "phaser";
 
 export interface NPCConfig {
+    id: string;
     x: number;
     y: number;
     texture: string;
     scale?: number;
     interactionRadius?: number;
     defaultAnimation?: string;
-    mapCoordinates: { x: number, y: number }; // Add this new property
+    mapCoordinates: { x: number, y: number };
 }
 
 export class NPC {
     private sprite: Phaser.Physics.Arcade.Sprite;
+    private config: NPCConfig;
     private scene: Phaser.Scene;
     private interactionZone: Phaser.GameObjects.Arc;
     private state: 'idle' | 'walking' | 'talking' | 'busy' = 'idle';
@@ -26,9 +28,14 @@ export class NPC {
     private wanderRadius: number = 100; // How far from home position the NPC can wander
     private currentAnimation: string = '';
     private mapCoordinates: { x: number, y: number };
+    private isColliding: boolean = false;
+    private lastCollisionTime: number = 0;
+    private collisionCooldown: number = 500; // 500ms cooldown between collision reports
+    private colliders: Phaser.Physics.Arcade.Collider[] = [];
     
     constructor(scene: Phaser.Scene, config: NPCConfig) {
         this.scene = scene;
+        this.config = config;
         this.interactionRadius = config.interactionRadius || 50;
         this.mapCoordinates = config.mapCoordinates;
 
@@ -36,12 +43,21 @@ export class NPC {
         this.sprite = scene.physics.add.sprite(config.x, config.y, config.texture);
         this.sprite.setScale(config.scale || 0.5);
         
+        // Enable physics on the sprite
+        scene.physics.world.enable(this.sprite);
+        
         // Configure physics body
-        this.sprite.setCollideWorldBounds(true);  // Keep NPC within world bounds
-        if (this.sprite.body) {
-            this.sprite.body.setSize(32, 32);         // Set collision body size
-            this.sprite.body.setOffset(16, 32);       // Adjust collision body offset
-        }
+        const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+        body.setCollideWorldBounds(true);
+        body.setSize(32, 32);
+        body.setOffset(0, 0);  // Adjust if needed based on your sprite
+        body.setImmovable(true);
+        
+        console.log('[NPC] Physics body configured:', {
+            width: body.width,
+            height: body.height,
+            offset: { x: body.offset.x, y: body.offset.y }
+        });
         
         // Don't allow the NPC to be pushed by collisions
         this.sprite.setImmovable(true);
@@ -81,6 +97,15 @@ export class NPC {
         // Update interaction zone position to follow NPC
         this.interactionZone.setPosition(this.sprite.x, this.sprite.y);
 
+        // Handle collisions before updating position
+        this.handleCollisions();
+
+        // Update sprite velocity based on current movement
+        const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+        if (!this.isColliding) {
+            body.setVelocity(this.currentVelocity.x * this.walkSpeed, this.currentVelocity.y * this.walkSpeed);
+        }
+
         // Update animation based on current state and facing
         if (this.state === 'walking') {
             this.playAnimation('walk');
@@ -89,24 +114,86 @@ export class NPC {
         }
     }
 
+    private handleCollisions(): void {
+        const now = Date.now();
+        const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+        
+        const isCollidingNow = body.blocked.up || 
+                              body.blocked.down || 
+                              body.blocked.left || 
+                              body.blocked.right;
+
+        if (isCollidingNow && (!this.isColliding || now - this.lastCollisionTime > this.collisionCooldown)) {
+            this.lastCollisionTime = now;
+            
+            const collision = {
+                up: body.blocked.up,
+                down: body.blocked.down,
+                left: body.blocked.left,
+                right: body.blocked.right
+            };
+
+            console.log('[NPC] Collision detected:', { id: this.getId(), collision });
+
+            // Stop movement immediately
+            this.currentVelocity = { x: 0, y: 0 };
+            body.setVelocity(0, 0);
+
+            // Send collision to server
+            this.scene.game.events.emit('npc-collision', {
+                npcId: this.getId(),
+                collision
+            });
+
+            // Update state
+            this.state = 'idle';
+            this.isColliding = true;
+        } else if (!isCollidingNow) {
+            this.isColliding = false;
+        }
+    }
+
+    public getId(): string {
+        return this.config.id;
+    }
+
     public updateFromNetwork(data: any): void {
         // Only update if NPC is in current map
         if (this.shouldBeVisible(data.mapCoordinates)) {
-            // Smoothly interpolate position
-            const targetX = data.x;
-            const targetY = data.y;
+            const body = this.sprite.body as Phaser.Physics.Arcade.Body;
             
-            // Simple linear interpolation
-            const lerpFactor = 0.3; // Adjust for smoother/faster movement
-            this.sprite.x += (targetX - this.sprite.x) * lerpFactor;
-            this.sprite.y += (targetY - this.sprite.y) * lerpFactor;
+            // Don't update position if we're colliding
+            if (this.isColliding) {
+                // Stop all movement
+                body.setVelocity(0, 0);
+                this.currentVelocity = { x: 0, y: 0 };
+                return;
+            }
 
             // Update state and facing
-            this.setState(data.state);
-            this.setFacing(data.facing);
+            this.state = data.state;
+            this.facing = data.facing;
+
+            // Update velocity
+            this.currentVelocity = data.currentVelocity;
+            
+            // Only update position if not colliding
+            if (!body.blocked.up && !body.blocked.down && 
+                !body.blocked.left && !body.blocked.right) {
+                this.sprite.x = data.x;
+                this.sprite.y = data.y;
+                body.setVelocity(
+                    this.currentVelocity.x * this.walkSpeed,
+                    this.currentVelocity.y * this.walkSpeed
+                );
+            }
 
             // Update animation based on state and facing
-            this.updateAnimation();
+            const animationKey = this.getAnimationKey();
+            if (this.currentAnimation !== animationKey) {
+                this.currentAnimation = animationKey;
+                this.sprite.play(animationKey);
+            }
         }
     }
 
@@ -222,5 +309,31 @@ export class NPC {
             this.sprite.play(newAnimation, true);
             this.currentAnimation = newAnimation;
         }
+    }
+
+    public setColliders(colliders: Phaser.Physics.Arcade.Collider[]): void {
+        this.colliders = colliders;
+    }
+
+    public destroy(): void {
+        // Remove all colliders
+        this.colliders.forEach(collider => {
+            if (collider) {
+                collider.destroy();
+            }
+        });
+        
+        // Destroy sprite and interaction zone
+        if (this.sprite) {
+            this.sprite.destroy();
+        }
+        if (this.interactionZone) {
+            this.interactionZone.destroy();
+        }
+    }
+
+    private getAnimationKey(): string {
+        const state = this.state === 'walking' ? 'walk' : 'idle';
+        return `npc_1_${state}_${this.facing}`;
     }
 }
