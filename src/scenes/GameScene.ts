@@ -315,7 +315,8 @@ export default class GameScene extends Phaser.Scene {
     public restoreNPCs(mapPosition: { x: number, y: number }): void {
         // First check if NPC already exists
         if (mapPosition.x === 0 && mapPosition.y === 0 && !this.npcManager.getNPC('merchant')) {
-            this.npcManager.createNPC('merchant', {
+            const npcConfig = {
+                id: 'merchant',
                 x: 100,
                 y: 100,
                 texture: 'npc_1',
@@ -323,9 +324,9 @@ export default class GameScene extends Phaser.Scene {
                 interactionRadius: 50,
                 defaultAnimation: 'npc_1_idle_down',
                 mapCoordinates: { x: 0, y: 0 }
-            });
+            };
+            this.npcManager.createNPC(npcConfig);
         }
-        // Add more map position conditions for other NPCs as needed
     }
 
     private setupNetworkHandlers(): void {
@@ -416,15 +417,16 @@ export default class GameScene extends Phaser.Scene {
         this.networkManager.on('initial-npc-states', (data) => {
             data.npcs.forEach((npcData: NPCState) => {
                 if (!this.npcManager.getNPC(npcData.id)) {
-                    this.npcManager.createNPC(npcData.id, {
+                    const npcConfig = {
+                        id: npcData.id,
                         x: npcData.x,
                         y: npcData.y,
                         texture: npcData.texture,
                         scale: npcData.scale,
                         interactionRadius: npcData.interactionRadius,
-                        defaultAnimation: npcData.defaultAnimation,
                         mapCoordinates: npcData.mapCoordinates
-                    });
+                    };
+                    this.npcManager.createNPC(npcConfig);
                 }
             });
         });

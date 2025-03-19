@@ -18,7 +18,8 @@ export class NetworkManager extends EventTarget {
 
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      this.dispatchEvent(new CustomEvent(data.type, { detail: data }));
+      console.log('[NetworkManager] Received message:', data);
+      this.handleMessage(data);
     };
 
     this.ws.onclose = () => {
@@ -104,5 +105,10 @@ export class NetworkManager extends EventTarget {
       console.log('[NetworkManager] Sending message:', message); // Debug log
       this.ws.send(JSON.stringify(message));
     }
+  }
+
+  private handleMessage(message: any): void {
+    // Dispatch the event
+    this.dispatchEvent(new CustomEvent(message.type, { detail: message }));
   }
 }

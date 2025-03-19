@@ -39,9 +39,10 @@ interface Player {
 }
 
 interface NPCMovementState {
-  lastPosition: { tileX: number, tileY: number };
-  distanceTraveled: number;
-  targetDistance: number;
+  currentPath: Array<TilePosition>;  // Current path of tiles to traverse
+  currentTileIndex: number;          // Current position in path
+  isMoving: boolean;                 // Whether NPC is currently moving
+  targetTile: TilePosition | null;   // Next tile to move to
 }
 
 interface NPCState {
@@ -59,6 +60,7 @@ interface NPCState {
   isColliding: boolean;
   lastCollisionTime: number;
   movementState: NPCMovementState;
+  currentTile: TilePosition;         // Current tile position
 }
 
 interface GameState {
@@ -98,6 +100,7 @@ function updateNPCPosition(npcId: string, npc: NPCState, oldMapCoords?: { x: num
 
 // Initialize default NPCs with complete configuration
 function initializeNPCs() {
+  // Create the merchant NPC
   const merchant: NPCState = {
     id: 'merchant',
     x: 200,
@@ -107,20 +110,23 @@ function initializeNPCs() {
     interactionRadius: 50,
     defaultAnimation: 'npc_1_idle_down',
     mapCoordinates: { x: 0, y: 0 },
-    state: 'walking',
+    state: 'idle',
     facing: 'down',
-    currentVelocity: { x: 0, y: 1 },
+    currentVelocity: { x: 0, y: 0 },
     isColliding: false,
     lastCollisionTime: 0,
-    movementState: initializeNPCMovement()
+    movementState: {
+      currentPath: [],
+      currentTileIndex: 0,
+      isMoving: false,
+      targetTile: null
+    },
+    currentTile: pixelsToTiles(200, 70)
   };
 
-  // Update the movement state with actual position after NPC is created
-  merchant.movementState.lastPosition = { x: merchant.x, y: merchant.y };
-  
+  // Add merchant to the game state and start initial movement
   updateNPCPosition('merchant', merchant);
-
-  // Add more NPCs here as needed
+  generateNewPath(merchant);
 }
 
 const MathUtils = {
@@ -147,85 +153,94 @@ const MathUtils = {
 
 function initializeNPCMovement(): NPCMovementState {
   return {
-    lastPosition: { tileX: 0, tileY: 0 },
-    distanceTraveled: 0,
-    targetDistance: MathUtils.Between(3, 8) // Now in tiles instead of pixels
+    currentPath: [],
+    currentTileIndex: 0,
+    isMoving: false,
+    targetTile: null
   };
 }
 
-function decideNPCMovement(npc: NPCState): void {
-  const currentTilePos = pixelsToTiles(npc.x, npc.y);
-  const lastTilePos = npc.movementState.lastPosition;
+function generateNewPath(npc: NPCState): void {
+  console.log('[Server] Attempting to generate new path for NPC:', npc.id);
 
-  // Calculate distance in tiles
-  const tileDistanceMoved = MathUtils.Distance.Between(
-    currentTilePos.tileX, currentTilePos.tileY,
-    lastTilePos.tileX, lastTilePos.tileY
-  );
-
-  npc.movementState.distanceTraveled += tileDistanceMoved;
-  npc.movementState.lastPosition = currentTilePos;
-
-  const shouldChangeDirection = 
-    npc.movementState.distanceTraveled >= npc.movementState.targetDistance ||
-    Math.random() < 0.02;  // 2% chance to change direction randomly
-
-  if (shouldChangeDirection) {
-    npc.movementState.distanceTraveled = 0;
-    npc.movementState.targetDistance = MathUtils.Between(3, 8); // 3-8 tiles
-
-    if (Math.random() < 0.2) {  // 20% chance to pause
-      npc.currentVelocity = { x: 0, y: 0 };
-      npc.state = 'idle';
-      
-      setTimeout(() => {
-        if (!npc) return;
-        chooseNewDirection(npc);
-      }, MathUtils.Between(1000, 3000));  // Pause for 1-3 seconds
-    } else {
-      chooseNewDirection(npc);
-    }
+  if (npc.movementState.isMoving) {
+    console.log(`[Server] NPC ${npc.id} is already moving, skipping`);
+    return;
   }
+
+  const directions = ['up', 'down', 'left', 'right'];
+  const direction = directions[Math.floor(Math.random() * directions.length)];
+  const steps = Math.floor(Math.random() * 3) + 2; // 2-4 steps
+
+  console.log(`[Server] Sending movement instruction for NPC ${npc.id}:`, {
+    direction,
+    steps,
+    state: 'walking'
+  });
+
+  broadcast({
+    type: 'npc-movement-instruction',
+    npcId: npc.id,
+    direction: direction,
+    steps: steps,
+    facing: direction,
+    state: 'walking'
+  });
+
+  // Update NPC state
+  npc.state = 'walking';
+  npc.facing = direction;
+  // npc.movementState.isMoving = true;
 }
 
-function chooseNewDirection(npc: NPCState): void {
-  const currentTilePos = pixelsToTiles(npc.x, npc.y);
+function handleNPCMovementComplete(npcId: string): void {
+  console.log(`[Server] NPC ${npcId} completed movement`);
+  const npc = npcStates.get(npcId);
+  if (!npc) return;
   
-  // Define possible directions
+  npc.movementState.isMoving = false;
+  npc.state = 'idle';
+  
+  // Generate new path immediately
+  generateNewPath(npc);
+}
+
+function chooseNewDirection(npc: NPCState): { x: number, y: number } {
   const directions = [
-    { x: 0, y: -1, facing: 'up' },    // up
-    { x: 0, y: 1, facing: 'down' },   // down
-    { x: -1, y: 0, facing: 'left' },  // left
-    { x: 1, y: 0, facing: 'right' }   // right
-  ] as const;
+    { x: 0, y: -1 },    // up
+    { x: 0, y: 1 },     // down
+    { x: -1, y: 0 },    // left
+    { x: 1, y: 0 }      // right
+  ];
 
-  let availableDirections = [...directions];
-
-  // If near map edges, filter out directions that would move towards the edge
-  if (currentTilePos.tileX < NPC_BUFFER_TILES) {
-    availableDirections = availableDirections.filter(dir => dir.x >= 0);
-  }
-  if (currentTilePos.tileX > MAP_WIDTH_TILES - NPC_BUFFER_TILES) {
-    availableDirections = availableDirections.filter(dir => dir.x <= 0);
-  }
-  if (currentTilePos.tileY < NPC_BUFFER_TILES) {
-    availableDirections = availableDirections.filter(dir => dir.y >= 0);
-  }
-  if (currentTilePos.tileY > MAP_HEIGHT_TILES - NPC_BUFFER_TILES) {
-    availableDirections = availableDirections.filter(dir => dir.y <= 0);
+  // Shuffle directions
+  for (let i = directions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [directions[i], directions[j]] = [directions[j], directions[i]];
   }
 
-  // If no directions are available (shouldn't happen with proper buffer), use all directions
-  if (availableDirections.length === 0) {
-    availableDirections = [...directions];
-  }
+  // Filter out directions that would move towards the map edge
+  const currentTilePos = pixelsToTiles(npc.x, npc.y);
+  const filteredDirections = directions.filter(dir => {
+    const newTile = {
+      tileX: currentTilePos.tileX + dir.x,
+      tileY: currentTilePos.tileY + dir.y
+    };
+    return newTile.tileX >= NPC_BUFFER_TILES && 
+           newTile.tileX < MAP_WIDTH_TILES - NPC_BUFFER_TILES &&
+           newTile.tileY >= NPC_BUFFER_TILES && 
+           newTile.tileY < MAP_HEIGHT_TILES - NPC_BUFFER_TILES;
+  });
 
-  // Choose random direction from available ones
-  const newDirection = availableDirections[Math.floor(Math.random() * availableDirections.length)];
-  
-  npc.currentVelocity = { x: newDirection.x, y: newDirection.y };
-  npc.state = 'walking';
-  npc.facing = newDirection.facing;
+  return filteredDirections[Math.floor(Math.random() * filteredDirections.length)] || { x: 0, y: 0 };
+}
+
+function getFacingFromDirection(direction: { x: number, y: number }): 'up' | 'down' | 'left' | 'right' {
+  if (direction.x === 0) {
+    return direction.y > 0 ? 'down' : 'up';
+  } else {
+    return direction.x > 0 ? 'right' : 'left';
+  }
 }
 
 // Call this when server starts
@@ -359,8 +374,11 @@ const server = Bun.serve<{ id: string }>({
           }));
           break;
         }
+        case "npc-movement-complete":
+          handleNPCMovementComplete(data.npcId);
+          break;
         case "npc-collision":
-          handleNPCCollision(data.npcId, data.collision);
+          handleNPCCollision(data.npcId);
           break;
       }
     },
@@ -420,58 +438,21 @@ function broadcast(
 
 console.log(`WebSocket server running on port ${server.port}`);
 
-function handleNPCCollision(npcId: string, collision: any) {
+function handleNPCCollision(npcId: string): void {
+  console.log(`[Server] NPC ${npcId} collision detected`);
   const npc = npcStates.get(npcId);
   if (!npc) return;
 
-  console.log(`[Server] NPC ${npcId} collision:`, collision);
-  
-  // Immediately stop the NPC
   npc.isColliding = true;
-  npc.lastCollisionTime = Date.now();
-  npc.currentVelocity = { x: 0, y: 0 };
+  npc.movementState.isMoving = false;
   npc.state = 'idle';
 
-  // Broadcast the stopped state immediately
-  broadcast({
-    type: 'npc-update',
-    npc: npc
-  });
-
-  // Wait before trying to move again
+  // Clear collision state and try new direction after 1 second
   setTimeout(() => {
     if (!npc) return;
-    
-    // Reset collision state
     npc.isColliding = false;
-    
-    // Choose a new direction avoiding the collision
-    const possibleDirections = [
-      { x: 0, y: 1 },   // down
-      { x: 0, y: -1 },  // up
-      { x: 1, y: 0 },   // right
-      { x: -1, y: 0 }   // left
-    ].filter(dir => {
-      if (collision.up && dir.y < 0) return false;
-      if (collision.down && dir.y > 0) return false;
-      if (collision.left && dir.x < 0) return false;
-      if (collision.right && dir.x > 0) return false;
-      return true;
-    });
-
-    if (possibleDirections.length > 0) {
-      const newDir = possibleDirections[Math.floor(Math.random() * possibleDirections.length)];
-      npc.currentVelocity = newDir;
-      npc.state = 'walking';
-      npc.facing = getFacingFromVelocity(newDir);
-      
-      // Broadcast the new movement state
-      broadcast({
-        type: 'npc-update',
-        npc: npc
-      });
-    }
-  }, 2000); // Wait 2 seconds before trying to move again
+    generateNewPath(npc);
+  }, 1000);
 }
 
 function getFacingFromVelocity(velocity: { x: number, y: number }): 'up' | 'down' | 'left' | 'right' {
@@ -530,45 +511,17 @@ function handleNPCMapEdge(npcId: string, edges: { up: boolean, down: boolean, le
   }, 2000);
 }
 
-// Update the movement interval for smoother updates
+
+// Make sure movement generation happens regularly
 setInterval(() => {
-  npcStates.forEach((npc, npcId) => {
-    // First decide if we need to change movement
-    if (npc.state !== 'idle') {
-      decideNPCMovement(npc);
-    }
-
-    // Then handle actual movement
-    if (!npc.isColliding && npc.state === 'walking') {
-      const newX = npc.x + npc.currentVelocity.x * 1;
-      const newY = npc.y + npc.currentVelocity.y * 1;
-
-      // Convert buffer tiles to pixels
-      const NPC_BUFFER = NPC_BUFFER_TILES * TILE_SIZE;
-
-      // Check for map edges
-      if (newX <= NPC_BUFFER || newX >= MAP_WIDTH - NPC_BUFFER || 
-          newY <= NPC_BUFFER || newY >= MAP_HEIGHT - NPC_BUFFER) {
-        
-        const edges = {
-          up: newY <= NPC_BUFFER,
-          down: newY >= MAP_HEIGHT - NPC_BUFFER,
-          left: newX <= NPC_BUFFER,
-          right: newX >= MAP_WIDTH - NPC_BUFFER
-        };
-
-        handleNPCMapEdge(npcId, edges);
-        return;
-      }
-
-      // If we reach here, the movement is valid
-      npc.x = newX;
-      npc.y = newY;
-      
-      broadcast({
-        type: 'npc-update',
-        npc: npc
-      });
+  console.log('[Server] Checking NPCs for movement updates');
+  npcStates.forEach((npc, id) => {
+    console.log(`[Server] NPC ${id} state:`, {
+      isMoving: npc.movementState.isMoving,
+      state: npc.state
+    });
+    if (!npc.movementState.isMoving) {
+      generateNewPath(npc);
     }
   });
-}, 50); // Updated from 100ms to 50ms for more frequent updates
+}, 3000); // Every 3 seconds
