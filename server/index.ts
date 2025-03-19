@@ -1,5 +1,9 @@
 import { Server } from "bun";
 
+const MAP_WIDTH = 24 * 16;  // 24 tiles * 16px
+const MAP_HEIGHT = 15 * 16; // 15 tiles * 16px
+const NPC_BUFFER = 16;      // Keep NPCs one tile away from edges
+
 interface Player {
   id: string;
   x: number;
@@ -335,15 +339,80 @@ function getFacingFromVelocity(velocity: { x: number, y: number }): 'up' | 'down
   }
 }
 
+function handleNPCMapEdge(npcId: string, edges: { up: boolean, down: boolean, left: boolean, right: boolean }) {
+  const npc = npcStates.get(npcId);
+  if (!npc) return;
+
+  console.log(`[Server] NPC ${npcId} reached map edge:`, edges);
+  
+  // Immediately stop the NPC
+  npc.currentVelocity = { x: 0, y: 0 };
+  npc.state = 'idle';
+
+  // Broadcast the stopped state immediately
+  broadcast({
+    type: 'npc-update',
+    npc: npc
+  });
+
+  // Wait before choosing new direction
+  setTimeout(() => {
+    if (!npc) return;
+    
+    // Choose a new direction avoiding the edges
+    const possibleDirections = [
+      { x: 0, y: 1 },   // down
+      { x: 0, y: -1 },  // up
+      { x: 1, y: 0 },   // right
+      { x: -1, y: 0 }   // left
+    ].filter(dir => {
+      if (edges.up && dir.y < 0) return false;
+      if (edges.down && dir.y > 0) return false;
+      if (edges.left && dir.x < 0) return false;
+      if (edges.right && dir.x > 0) return false;
+      return true;
+    });
+
+    if (possibleDirections.length > 0) {
+      const newDir = possibleDirections[Math.floor(Math.random() * possibleDirections.length)];
+      npc.currentVelocity = newDir;
+      npc.state = 'walking';
+      npc.facing = getFacingFromVelocity(newDir);
+      
+      broadcast({
+        type: 'npc-update',
+        npc: npc
+      });
+    }
+  }, 2000);
+}
+
 // Update the movement interval for smoother updates
 setInterval(() => {
   npcStates.forEach((npc, npcId) => {
     if (!npc.isColliding && npc.state === 'walking') {
-      // Move the NPC with smaller increments
-      npc.x += npc.currentVelocity.x * 1; // Reduced from 2 to 1
-      npc.y += npc.currentVelocity.y * 1;
+      const newX = npc.x + npc.currentVelocity.x * 1;
+      const newY = npc.y + npc.currentVelocity.y * 1;
+
+      // Check for map edges
+      if (newX <= NPC_BUFFER || newX >= MAP_WIDTH - NPC_BUFFER || 
+          newY <= NPC_BUFFER || newY >= MAP_HEIGHT - NPC_BUFFER) {
+        
+        const edges = {
+          up: newY <= NPC_BUFFER,
+          down: newY >= MAP_HEIGHT - NPC_BUFFER,
+          left: newX <= NPC_BUFFER,
+          right: newX >= MAP_WIDTH - NPC_BUFFER
+        };
+
+        handleNPCMapEdge(npcId, edges);
+        return;
+      }
+
+      // If we reach here, the movement is valid
+      npc.x = newX;
+      npc.y = newY;
       
-      // Broadcast update
       broadcast({
         type: 'npc-update',
         npc: npc
