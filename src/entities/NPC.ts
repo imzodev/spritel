@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import GameScene from "../scenes/GameScene";
 
 export interface NPCConfig {
     id: string;
@@ -14,7 +15,7 @@ export interface NPCConfig {
 export class NPC {
     private sprite: Phaser.Physics.Arcade.Sprite;
     private config: NPCConfig;
-    private scene: Phaser.Scene;
+    private scene: GameScene
     private interactionZone: Phaser.GameObjects.Arc;
     private state: 'idle' | 'walking' | 'talking' | 'busy' = 'idle';
     private interactionRadius: number;
@@ -249,14 +250,25 @@ export class NPC {
         }
     }
 
-    public isPlayerInRange(player: Phaser.Physics.Arcade.Sprite): boolean {
+    public isInInteractionRange(): boolean {
+        const gameScene = this.scene as GameScene;
+        const player = gameScene.getPlayer();
+        if (!player) {
+            return false;
+        }
+
+        const playerSprite = player.getSprite();
         const distance = Phaser.Math.Distance.Between(
-            player.x,
-            player.y,
+            playerSprite.x,
+            playerSprite.y,
             this.sprite.x,
             this.sprite.y
         );
-        return distance <= this.interactionRadius;
+
+        const inRange = distance <= this.interactionRadius;
+        this.interactionZone.setVisible(inRange);
+        
+        return inRange;
     }
 
     public setState(newState: 'idle' | 'walking' | 'talking' | 'busy'): void {
