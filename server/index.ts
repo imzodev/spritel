@@ -168,20 +168,20 @@ function decideNPCMovement(npc: NPCState): void {
 
   const shouldChangeDirection = 
     npc.movementState.distanceTraveled >= npc.movementState.targetDistance ||
-    Math.random() < 0.02;
+    Math.random() < 0.02;  // 2% chance to change direction randomly
 
   if (shouldChangeDirection) {
     npc.movementState.distanceTraveled = 0;
     npc.movementState.targetDistance = MathUtils.Between(3, 8); // 3-8 tiles
 
-    if (Math.random() < 0.2) {
+    if (Math.random() < 0.2) {  // 20% chance to pause
       npc.currentVelocity = { x: 0, y: 0 };
       npc.state = 'idle';
       
       setTimeout(() => {
         if (!npc) return;
         chooseNewDirection(npc);
-      }, MathUtils.Between(1000, 3000));
+      }, MathUtils.Between(1000, 3000));  // Pause for 1-3 seconds
     } else {
       chooseNewDirection(npc);
     }
@@ -191,38 +191,41 @@ function decideNPCMovement(npc: NPCState): void {
 function chooseNewDirection(npc: NPCState): void {
   const currentTilePos = pixelsToTiles(npc.x, npc.y);
   
-  // Check if too close to map edges in terms of tiles
-  if (currentTilePos.tileX < NPC_BUFFER_TILES || 
-      currentTilePos.tileX > MAP_WIDTH_TILES - NPC_BUFFER_TILES ||
-      currentTilePos.tileY < NPC_BUFFER_TILES || 
-      currentTilePos.tileY > MAP_HEIGHT_TILES - NPC_BUFFER_TILES) {
-    
-    // Move towards center tile
-    const centerTileX = Math.floor(MAP_WIDTH_TILES / 2);
-    const centerTileY = Math.floor(MAP_HEIGHT_TILES / 2);
-    
-    const angleToCenter = MathUtils.Angle.Between(
-      currentTilePos.tileX, currentTilePos.tileY,
-      centerTileX, centerTileY
-    );
+  // Define possible directions
+  const directions = [
+    { x: 0, y: -1, facing: 'up' },    // up
+    { x: 0, y: 1, facing: 'down' },   // down
+    { x: -1, y: 0, facing: 'left' },  // left
+    { x: 1, y: 0, facing: 'right' }   // right
+  ] as const;
 
-    const randomAngle = angleToCenter + MathUtils.DegToRad(MathUtils.Between(-45, 45));
-    
-    npc.currentVelocity = {
-      x: Math.cos(randomAngle),
-      y: Math.sin(randomAngle)
-    };
-  } else {
-    // Random direction when in safe area
-    const randomAngle = MathUtils.DegToRad(MathUtils.Between(0, 360));
-    npc.currentVelocity = {
-      x: Math.cos(randomAngle),
-      y: Math.sin(randomAngle)
-    };
+  let availableDirections = [...directions];
+
+  // If near map edges, filter out directions that would move towards the edge
+  if (currentTilePos.tileX < NPC_BUFFER_TILES) {
+    availableDirections = availableDirections.filter(dir => dir.x >= 0);
+  }
+  if (currentTilePos.tileX > MAP_WIDTH_TILES - NPC_BUFFER_TILES) {
+    availableDirections = availableDirections.filter(dir => dir.x <= 0);
+  }
+  if (currentTilePos.tileY < NPC_BUFFER_TILES) {
+    availableDirections = availableDirections.filter(dir => dir.y >= 0);
+  }
+  if (currentTilePos.tileY > MAP_HEIGHT_TILES - NPC_BUFFER_TILES) {
+    availableDirections = availableDirections.filter(dir => dir.y <= 0);
   }
 
+  // If no directions are available (shouldn't happen with proper buffer), use all directions
+  if (availableDirections.length === 0) {
+    availableDirections = directions;
+  }
+
+  // Choose random direction from available ones
+  const newDirection = availableDirections[Math.floor(Math.random() * availableDirections.length)];
+  
+  npc.currentVelocity = { x: newDirection.x, y: newDirection.y };
   npc.state = 'walking';
-  npc.facing = getFacingFromVelocity(npc.currentVelocity);
+  npc.facing = newDirection.facing;
 }
 
 // Call this when server starts
@@ -530,6 +533,12 @@ function handleNPCMapEdge(npcId: string, edges: { up: boolean, down: boolean, le
 // Update the movement interval for smoother updates
 setInterval(() => {
   npcStates.forEach((npc, npcId) => {
+    // First decide if we need to change movement
+    if (npc.state !== 'idle') {
+      decideNPCMovement(npc);
+    }
+
+    // Then handle actual movement
     if (!npc.isColliding && npc.state === 'walking') {
       const newX = npc.x + npc.currentVelocity.x * 1;
       const newY = npc.y + npc.currentVelocity.y * 1;
