@@ -1,8 +1,34 @@
 import { Server } from "bun";
 
-const MAP_WIDTH = 24 * 16;  // 24 tiles * 16px
-const MAP_HEIGHT = 15 * 16; // 15 tiles * 16px
-const NPC_BUFFER = 16;      // Keep NPCs one tile away from edges
+// Constants for tile-based calculations
+const TILE_SIZE = 16; // Size of each tile in pixels
+const MAP_WIDTH_TILES = 24;
+const MAP_HEIGHT_TILES = 15;
+const NPC_BUFFER_TILES = 2; // Keep NPCs 2 tiles away from edges
+
+// Convert to pixels when needed
+const MAP_WIDTH = MAP_WIDTH_TILES * TILE_SIZE;
+const MAP_HEIGHT = MAP_HEIGHT_TILES * TILE_SIZE;
+
+interface TilePosition {
+  tileX: number;
+  tileY: number;
+}
+
+// Helper functions for conversion
+function pixelsToTiles(x: number, y: number): TilePosition {
+  return {
+    tileX: Math.floor(x / TILE_SIZE),
+    tileY: Math.floor(y / TILE_SIZE)
+  };
+}
+
+function tilesToPixels(tileX: number, tileY: number): { x: number, y: number } {
+  return {
+    x: (tileX * TILE_SIZE) + (TILE_SIZE / 2), // Center of tile
+    y: (tileY * TILE_SIZE) + (TILE_SIZE / 2)  // Center of tile
+  };
+}
 
 interface Player {
   id: string;
@@ -10,6 +36,12 @@ interface Player {
   y: number;
   animation: string;
   mapPosition: { x: number; y: number };
+}
+
+interface NPCMovementState {
+  lastPosition: { tileX: number, tileY: number };
+  distanceTraveled: number;
+  targetDistance: number;
 }
 
 interface NPCState {
@@ -26,6 +58,7 @@ interface NPCState {
   currentVelocity: { x: number; y: number };
   isColliding: boolean;
   lastCollisionTime: number;
+  movementState: NPCMovementState;
 }
 
 interface GameState {
@@ -78,11 +111,118 @@ function initializeNPCs() {
     facing: 'down',
     currentVelocity: { x: 0, y: 1 },
     isColliding: false,
-    lastCollisionTime: 0
+    lastCollisionTime: 0,
+    movementState: initializeNPCMovement()
   };
+
+  // Update the movement state with actual position after NPC is created
+  merchant.movementState.lastPosition = { x: merchant.x, y: merchant.y };
+  
   updateNPCPosition('merchant', merchant);
 
   // Add more NPCs here as needed
+}
+
+const MathUtils = {
+  Between(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  },
+  
+  Distance: {
+    Between(x1: number, y1: number, x2: number, y2: number): number {
+      return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    }
+  },
+
+  Angle: {
+    Between(x1: number, y1: number, x2: number, y2: number): number {
+      return Math.atan2(y2 - y1, x2 - x1);
+    }
+  },
+
+  DegToRad(degrees: number): number {
+    return degrees * (Math.PI / 180);
+  }
+};
+
+function initializeNPCMovement(): NPCMovementState {
+  return {
+    lastPosition: { tileX: 0, tileY: 0 },
+    distanceTraveled: 0,
+    targetDistance: MathUtils.Between(3, 8) // Now in tiles instead of pixels
+  };
+}
+
+function decideNPCMovement(npc: NPCState): void {
+  const currentTilePos = pixelsToTiles(npc.x, npc.y);
+  const lastTilePos = npc.movementState.lastPosition;
+
+  // Calculate distance in tiles
+  const tileDistanceMoved = MathUtils.Distance.Between(
+    currentTilePos.tileX, currentTilePos.tileY,
+    lastTilePos.tileX, lastTilePos.tileY
+  );
+
+  npc.movementState.distanceTraveled += tileDistanceMoved;
+  npc.movementState.lastPosition = currentTilePos;
+
+  const shouldChangeDirection = 
+    npc.movementState.distanceTraveled >= npc.movementState.targetDistance ||
+    Math.random() < 0.02;
+
+  if (shouldChangeDirection) {
+    npc.movementState.distanceTraveled = 0;
+    npc.movementState.targetDistance = MathUtils.Between(3, 8); // 3-8 tiles
+
+    if (Math.random() < 0.2) {
+      npc.currentVelocity = { x: 0, y: 0 };
+      npc.state = 'idle';
+      
+      setTimeout(() => {
+        if (!npc) return;
+        chooseNewDirection(npc);
+      }, MathUtils.Between(1000, 3000));
+    } else {
+      chooseNewDirection(npc);
+    }
+  }
+}
+
+function chooseNewDirection(npc: NPCState): void {
+  const currentTilePos = pixelsToTiles(npc.x, npc.y);
+  
+  // Check if too close to map edges in terms of tiles
+  if (currentTilePos.tileX < NPC_BUFFER_TILES || 
+      currentTilePos.tileX > MAP_WIDTH_TILES - NPC_BUFFER_TILES ||
+      currentTilePos.tileY < NPC_BUFFER_TILES || 
+      currentTilePos.tileY > MAP_HEIGHT_TILES - NPC_BUFFER_TILES) {
+    
+    // Move towards center tile
+    const centerTileX = Math.floor(MAP_WIDTH_TILES / 2);
+    const centerTileY = Math.floor(MAP_HEIGHT_TILES / 2);
+    
+    const angleToCenter = MathUtils.Angle.Between(
+      currentTilePos.tileX, currentTilePos.tileY,
+      centerTileX, centerTileY
+    );
+
+    const randomAngle = angleToCenter + MathUtils.DegToRad(MathUtils.Between(-45, 45));
+    
+    npc.currentVelocity = {
+      x: Math.cos(randomAngle),
+      y: Math.sin(randomAngle)
+    };
+  } else {
+    // Random direction when in safe area
+    const randomAngle = MathUtils.DegToRad(MathUtils.Between(0, 360));
+    npc.currentVelocity = {
+      x: Math.cos(randomAngle),
+      y: Math.sin(randomAngle)
+    };
+  }
+
+  npc.state = 'walking';
+  npc.facing = getFacingFromVelocity(npc.currentVelocity);
 }
 
 // Call this when server starts
@@ -393,6 +533,9 @@ setInterval(() => {
     if (!npc.isColliding && npc.state === 'walking') {
       const newX = npc.x + npc.currentVelocity.x * 1;
       const newY = npc.y + npc.currentVelocity.y * 1;
+
+      // Convert buffer tiles to pixels
+      const NPC_BUFFER = NPC_BUFFER_TILES * TILE_SIZE;
 
       // Check for map edges
       if (newX <= NPC_BUFFER || newX >= MAP_WIDTH - NPC_BUFFER || 
