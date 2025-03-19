@@ -51,15 +51,26 @@ export class NPC {
         // Configure physics body
         const body = this.sprite.body as Phaser.Physics.Arcade.Body;
         body.setCollideWorldBounds(true);
-        body.setSize(32, 32);
-        body.setOffset(0, 0);  // Adjust if needed based on your sprite
-        body.setImmovable(true);
+        
+        // Adjust these values based on your sprite's actual size
+        const bodyWidth = 28;  // Width of collision box
+        const bodyHeight = 28; // Height of collision box
+        
+        // Calculate offsets to center the collision box
+        const offsetX = (this.sprite.width - bodyWidth) / 2;
+        const offsetY = (this.sprite.height - bodyHeight);
+        
+        body.setSize(bodyWidth, bodyHeight);
+        body.setOffset(offsetX, offsetY);
         
         console.log('[NPC] Physics body configured:', {
             width: body.width,
             height: body.height,
-            offset: { x: body.offset.x, y: body.offset.y }
+            offset: { x: body.offset.x, y: body.offset.y },
+            spriteSize: { width: this.sprite.width, height: this.sprite.height }
         });
+        
+        body.setImmovable(true);
         
         // Don't allow the NPC to be pushed by collisions
         this.sprite.setImmovable(true);
