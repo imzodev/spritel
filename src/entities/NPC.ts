@@ -72,7 +72,6 @@ export class NPC {
         console.log('[NPC] Setting up movement instruction listener');
         this.scene.networkManager.on('npc-movement-instruction', (data: any) => {
             if (data.npcId === this.config.id) {
-                console.log(`[NPC ${this.config.id}] Processing movement instruction:`, data);
                 this.handleMovementInstruction(data);
             }
         });
@@ -138,21 +137,10 @@ export class NPC {
     public update(): void {
         // Log movement state periodically
         if (this.isMoving) {
-            console.log(`[NPC ${this.config.id}] Movement Status:`, {
-                isMoving: this.isMoving,
-                stepsRemaining: this.stepsRemaining,
-                currentDirection: this.currentDirection,
-                state: this.state,
-                position: { x: this.sprite.x, y: this.sprite.y },
-                velocity: (this.sprite.body as Phaser.Physics.Arcade.Body).velocity
-            });
+
         }
         
         if (this.isMoving && this.stepsRemaining > 0) {
-            console.log(`[NPC ${this.config.id}] Processing movement:`, {
-                direction: this.currentDirection,
-                stepsRemaining: this.stepsRemaining
-            });
 
             const speed = (16 * this.moveSpeed) / 60; // Convert to pixels per frame
             let velocityX = 0;
@@ -378,7 +366,6 @@ export class NPC {
         facing: string,
         state: string
     }): void {
-        console.log(`[NPC ${this.config.id}] Processing movement instruction:`, data);
         
         this.isMoving = true;
         this.stepsRemaining = data.steps;

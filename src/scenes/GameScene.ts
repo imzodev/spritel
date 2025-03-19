@@ -326,6 +326,7 @@ export default class GameScene extends Phaser.Scene {
                 mapCoordinates: { x: 0, y: 0 }
             };
             this.npcManager.createNPC(npcConfig);
+            console.log('[GameScene] Merchant NPC created');
         }
     }
 
@@ -348,11 +349,7 @@ export default class GameScene extends Phaser.Scene {
         });
 
         this.networkManager.on('player-update', (data) => {
-            console.log('[NetworkHandler] Received player-update:', {
-                playerId: data.player.id,
-                mapPosition: data.player.mapPosition,
-                currentPlayerId: this.player.getId()
-            });
+           
             
             if (!data.player.id || data.player.id === this.player.getId()) {
                 console.log('[NetworkHandler] Ignoring update for self');
@@ -376,17 +373,12 @@ export default class GameScene extends Phaser.Scene {
         });
 
         this.networkManager.on('player-map-changed', (data) => {
-            console.log('Received player-map-changed:', data);
             if (data.player) {
                 this.handlePlayerUpdate(data.player, 'player-map-changed');
             }
         });
 
         this.networkManager.on('player-left', (data) => {
-            console.log('[NetworkHandler] Received player-left:', {
-                playerId: data.playerId
-            });
-            
             const existingSprite = this.otherPlayers.get(data.playerId);
             const existingPhysicsSprite = this.otherPlayersPhysics.get(data.playerId);
             
@@ -480,13 +472,6 @@ export default class GameScene extends Phaser.Scene {
             y: parseInt(currentY) 
         };
         
-        console.log('[HandlePlayerUpdate] Processing update:', {
-            playerId: playerData.id,
-            playerMapPos: playerData.mapPosition,
-            currentMap: currentMap,
-            action: source
-        });
-
         // If player is in a different map, remove their sprite
         if (!playerData.mapPosition || 
             playerData.mapPosition.x !== currentMap.x || 
