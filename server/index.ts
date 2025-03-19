@@ -276,19 +276,58 @@ setInterval(() => {
       
       // Random direction change
       if (Math.random() < 0.02) { // 2% chance per update
-        npc.currentVelocity = {
-          x: (Math.random() - 0.5) * 2,
-          y: (Math.random() - 0.5) * 2
-        };
-        npc.facing = determineNPCFacing(npc.currentVelocity);
+        // Choose a random cardinal direction (0: up, 1: right, 2: down, 3: left)
+        const direction = Math.floor(Math.random() * 4);
+        const speed = 1; // Base movement speed
+        
+        // Reset velocities and set new direction
+        npc.currentVelocity = { x: 0, y: 0 };
+        
+        switch (direction) {
+          case 0: // up
+            npc.currentVelocity.y = -speed;
+            npc.facing = 'up';
+            break;
+          case 1: // right
+            npc.currentVelocity.x = speed;
+            npc.facing = 'right';
+            break;
+          case 2: // down
+            npc.currentVelocity.y = speed;
+            npc.facing = 'down';
+            break;
+          case 3: // left
+            npc.currentVelocity.x = -speed;
+            npc.facing = 'left';
+            break;
+        }
       }
     } else if (Math.random() < 0.01) { // 1% chance to start walking
+      // Choose a random cardinal direction (0: up, 1: right, 2: down, 3: left)
+      const direction = Math.floor(Math.random() * 4);
+      const speed = 1; // Base movement speed
+      
       npc.state = 'walking';
-      npc.currentVelocity = {
-        x: (Math.random() - 0.5) * 2,
-        y: (Math.random() - 0.5) * 2
-      };
-      npc.facing = determineNPCFacing(npc.currentVelocity);
+      npc.currentVelocity = { x: 0, y: 0 }; // Reset velocity
+      
+      switch (direction) {
+        case 0: // up
+          npc.currentVelocity.y = -speed;
+          npc.facing = 'up';
+          break;
+        case 1: // right
+          npc.currentVelocity.x = speed;
+          npc.facing = 'right';
+          break;
+        case 2: // down
+          npc.currentVelocity.y = speed;
+          npc.facing = 'down';
+          break;
+        case 3: // left
+          npc.currentVelocity.x = -speed;
+          npc.facing = 'left';
+          break;
+      }
     }
 
     // Broadcast NPC updates to all clients in the same map
@@ -306,10 +345,5 @@ setInterval(() => {
   });
 }, 100); // Update every 100ms
 
-function determineNPCFacing(velocity: { x: number, y: number }): 'up' | 'down' | 'left' | 'right' {
-  if (Math.abs(velocity.x) > Math.abs(velocity.y)) {
-    return velocity.x > 0 ? 'right' : 'left';
-  } else {
-    return velocity.y > 0 ? 'down' : 'up';
-  }
-}
+// The determineNPCFacing function has been removed as it's no longer needed
+// The facing direction is now set directly when choosing movement direction
