@@ -6,6 +6,7 @@ const TILE_SIZE = 16; // Size of each tile in pixels
 const MAP_WIDTH_TILES = 24;
 const MAP_HEIGHT_TILES = 15;
 const NPC_BUFFER_TILES = 1; // Keep NPCs 1 tiles away from edges
+const PIXELS_PER_SECOND = 60;
 
 // Convert to pixels when needed
 const MAP_WIDTH = MAP_WIDTH_TILES * TILE_SIZE;
@@ -139,7 +140,7 @@ export class NPC {
 
     public update(): void {
         if (this.isMoving) {
-            const speed = (16 * this.moveSpeed) / 60; // Convert to pixels per frame
+            const speed = (16 * this.moveSpeed) / PIXELS_PER_SECOND; // Convert to pixels per frame
             let velocityX = 0;
             let velocityY = 0;
 
@@ -173,19 +174,20 @@ export class NPC {
     
 
             // Check if we've reached the target position
-            const hasReachedTarget = this.hasReachedTarget();
-            if (hasReachedTarget) {
-                this.isMoving = false;
-                this.state = 'idle';
-                this.updateAnimation();
+            // Is causing errors, we will instead ask for a new path every 5 seconds instead
+            // const hasReachedTarget = this.hasReachedTarget();
+            // if (hasReachedTarget) {
+            //     this.isMoving = false;
+            //     this.state = 'idle';
+            //     this.updateAnimation();
                 
-                // Notify server that movement is complete
-                this.scene.getNetworkManager().sendNPCMovementComplete({
-                    npcId: this.config.id,
-                    x: this.sprite.x,
-                    y: this.sprite.y
-                });
-            }
+            //     // Notify server that movement is complete
+            //     this.scene.getNetworkManager().sendNPCMovementComplete({
+            //         npcId: this.config.id,
+            //         x: this.sprite.x,
+            //         y: this.sprite.y
+            //     });
+            // }
         }
         this.updateAnimation();
 
@@ -458,8 +460,9 @@ export class NPC {
         this.facing = data.facing;
         this.state = data.state;
         
-        const speed = 60; // Pixels per second
+        const speed = PIXELS_PER_SECOND; // Pixels per second
         const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+        this.targetPosition = { x: data.targetX, y: data.targetY };
 
         // Simple velocity setting based on direction
         if (data.facing === 'up') body.setVelocity(0, -speed);
@@ -476,8 +479,9 @@ export class NPC {
         const threshold = 1;
         const targetX = this.targetPosition?.x ?? this.sprite.x;
         const targetY = this.targetPosition?.y ?? this.sprite.y;
+        console.log(`[NPC ${this.config.id}] Checking if reached target: (${this.sprite.x}, ${this.sprite.y}) vs (${targetX}, ${targetY})`);
         
-        return Math.abs(this.sprite.x - targetX) < threshold && 
+        return Math.abs(this.sprite.x - targetX) < threshold || 
                Math.abs(this.sprite.y - targetY) < threshold;
     }
 
