@@ -6,7 +6,7 @@ const TILE_SIZE = 16; // Size of each tile in pixels
 const MAP_WIDTH_TILES = 24;
 const MAP_HEIGHT_TILES = 15;
 const NPC_BUFFER_TILES = 1; // Keep NPCs 1 tiles away from edges
-const PIXELS_PER_SECOND = 60;
+const PIXELS_PER_SECOND = 16;
 
 // Convert to pixels when needed
 const MAP_WIDTH = MAP_WIDTH_TILES * TILE_SIZE;
@@ -158,7 +158,8 @@ export class NPC {
                     velocityX = speed;
                     break;
             }
-
+            console.log(`[NPC] Updating position with velocity: (${velocityX}, ${velocityY})`);
+            
             // Update sprite position
             this.sprite.x += velocityX;
             this.sprite.y += velocityY;
@@ -458,6 +459,7 @@ export class NPC {
     }): void {
         this.isMoving = true;
         this.facing = data.facing;
+        this.currentDirection = data.facing;
         this.state = data.state;
         
         const speed = PIXELS_PER_SECOND; // Pixels per second
