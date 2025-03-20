@@ -56,11 +56,6 @@ export class NPC {
     private homePosition: { x: number, y: number };
 
     constructor(scene: GameScene, config: NPCConfig) {
-        console.log('[NPC] Initializing NPC:', config.id, {
-            position: { x: config.x, y: config.y },
-            texture: config.texture
-        });
-        
         this.scene = scene;
         this.config = config;
         this.interactionRadius = config.interactionRadius || 50;
@@ -77,7 +72,6 @@ export class NPC {
         this.handleMovementInstruction = this.handleMovementInstruction.bind(this);
         
         // Listen for movement instructions from NetworkManager instead of game events
-        console.log('[NPC] Setting up movement instruction listener');
         this.scene.getNetworkManager().on('npc-movement-instruction', (data: any) => {
             if (data.npcId === this.config.id) {
                 this.handleMovementInstruction(data);
@@ -99,13 +93,6 @@ export class NPC {
         body.setSize(bodyWidth, bodyHeight);
         body.setOffset(offsetX, offsetY);
         
-        console.log('[NPC] Physics body configured:', {
-            width: body.width,
-            height: body.height,
-            offset: { x: body.offset.x, y: body.offset.y },
-            spriteSize: { width: this.sprite.width, height: this.sprite.height }
-        });
-        
         body.setImmovable(true);
         
         // Don't allow the NPC to be pushed by collisions
@@ -118,7 +105,6 @@ export class NPC {
         // Start default animation if provided
         if (config.defaultAnimation) {
             this.sprite.play(config.defaultAnimation);
-            console.log('Playing animation:', config.defaultAnimation);
         }
         
         // Create interaction zone
@@ -143,11 +129,6 @@ export class NPC {
     }
 
     public update(): void {
-        // Log movement state periodically
-        if (this.isMoving) {
-
-        }
-        
         if (this.isMoving && this.stepsRemaining > 0) {
 
             const speed = (16 * this.moveSpeed) / 60; // Convert to pixels per frame
@@ -180,10 +161,9 @@ export class NPC {
 
             // Check if we've completed a tile movement
             if (this.hasCompletedTileMovement()) {
-                console.log(`[NPC ${this.config.id}] Completed tile movement`);
                 this.stepsRemaining--;
                 if (this.stepsRemaining <= 0) {
-                    console.log(`[NPC ${this.config.id}] Movement sequence complete`);
+                    console.log(`[NPC ${this.config.id}] Completed tile movement`);
                     this.isMoving = false;
                     this.state = 'idle';
                     this.updateAnimation();
@@ -210,7 +190,6 @@ export class NPC {
         if (body.blocked.up || body.blocked.down || body.blocked.left || body.blocked.right) {
             this.isMoving = false;
             this.state = 'idle';
-            console.log(`[NPC ${this.config.id}] Collision detected, stopping movement facing: ${this.facing}`);
             this.scene.getNetworkManager().sendNPCCollision({
                 npcId: this.getId(),
                 collision: {
@@ -449,10 +428,6 @@ export class NPC {
         }
         
         this.updateAnimation();
-        console.log(`[NPC ${this.config.id}] Movement started:`, {
-            velocity: body.velocity,
-            position: { x: this.sprite.x, y: this.sprite.y }
-        });
     }
 
     private hasCompletedTileMovement(): boolean {
