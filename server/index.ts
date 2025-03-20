@@ -86,7 +86,9 @@ function initializeNPCs() {
       isMoving: false,
       targetTile: null
     },
-    currentTile: pixelsToTiles(200, 70)
+    currentTile: pixelsToTiles(200, 70),
+    paused: false, // Add paused state
+    isInteracting: false
   };
 
   // Add merchant to the game state and start initial movement
@@ -143,14 +145,12 @@ function generateNewPath(npc: NPCState, isIntervalUpdate: boolean = false): void
     return;
   }
 
-  console.log(`[Server] Generating new path for NPC ${npc.id}`);
   
   // Only update lastPathUpdate for collision-triggered updates
   if (!isIntervalUpdate) {
     lastPathUpdate = now;
   }
 
-  console.log(`[Server] Attempting to generate new path for NPC ${npc.id} currently facing ${npc.facing}`);
 
   // Get current position
   const currentX = npc.x;
@@ -172,12 +172,6 @@ function generateNewPath(npc: NPCState, isIntervalUpdate: boolean = false): void
     case 'left': targetX -= distance; break;
     case 'right': targetX += distance; break;
   }
-
-  console.log(`[Server] Generated path for NPC ${npc.id}:`, {
-    from: { x: currentX, y: currentY },
-    to: { x: targetX, y: targetY },
-    direction: newDirection
-  });
 
   broadcast({
     type: 'npc-movement-instruction',
@@ -362,6 +356,12 @@ const server = Bun.serve<{ id: string }>({
         case "npc-collision":
           handleNPCCollision(data);
           break;
+        case "INTERACTION_START":
+          handleInteractionStart(data);
+          break;
+        case "INTERACTION_END":
+          handleInteractionEnd(data);
+          break;
       }
     },
     close(ws) {
@@ -500,11 +500,41 @@ function handleNPCMapEdge(data: {
     }, 1000);
 }
 
+function handleInteractionStart(data: { npcId: string }): void {
+  console.log(`[Server] Received interaction start for NPC ${data.npcId}`);
+  const npc = npcStates.get(data.npcId);
+  
+  if (npc) {
+    console.log(`[Server] NPC ${data.npcId} interaction started`);
+    npc.paused = true;
+    broadcast({
+      type: 'npc-paused',
+      npcId: data.npcId,
+      paused: true
+    });
+  }
+}
+
+function handleInteractionEnd(data: { npcId: string }): void {
+  console.log(`[Server] NPC ${data.npcId} interaction ended`);
+
+  const npc = npcStates.get(data.npcId);
+  if (npc) {
+    npc.paused = false;
+    broadcast({
+      type: 'npc-paused',
+      npcId: data.npcId,
+      paused: false
+    });
+  }
+}
 
 // Global update every 5 seconds
 setInterval(() => {
   console.log('[Server] Global NPC path update');
   npcStates.forEach((npc, id) => {
-    generateNewPath(npc, true);  // This is an interval update
+    if (!npc.paused) {
+      generateNewPath(npc, true);  // This is an interval update
+    }
   });
 }, THROTTLE_INTERVAL); // Every 5 seconds

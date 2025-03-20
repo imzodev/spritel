@@ -1,7 +1,14 @@
-
 import { Player } from "../entities/Player";
 
 type MessageHandler = (data: any) => void;
+
+export enum EventTypes {
+  CONNECT = 'connect',
+  DISCONNECT = 'disconnect',
+  INTERACTION_START = 'INTERACTION_START',
+  INTERACTION_END = 'INTERACTION_END',
+  NPC_PAUSED = 'NPC_PAUSED'
+}
 
 export class NetworkManager extends EventTarget {
   private ws: WebSocket;
@@ -13,7 +20,7 @@ export class NetworkManager extends EventTarget {
     
     this.ws.onopen = () => {
       console.log('Connected to server');
-      this.dispatchEvent(new Event('connect'));
+      this.dispatchEvent(new Event(EventTypes.CONNECT));
     };
 
     this.ws.onmessage = (event) => {
@@ -24,7 +31,7 @@ export class NetworkManager extends EventTarget {
 
     this.ws.onclose = () => {
       console.log('Disconnected from server');
-      this.dispatchEvent(new Event('disconnect'));
+      this.dispatchEvent(new Event(EventTypes.DISCONNECT));
     };
   }
 
@@ -127,6 +134,24 @@ export class NetworkManager extends EventTarget {
       this.ws.send(JSON.stringify({
         type: 'npc-map-edge',
         ...data
+      }));
+    }
+  }
+
+  public sendInteractionStart(npcId: string) {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: EventTypes.INTERACTION_START,
+        npcId,
+      }));
+    }
+  }
+
+  public sendInteractionEnd(npcId: string) {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: EventTypes.INTERACTION_END,
+        npcId,
       }));
     }
   }

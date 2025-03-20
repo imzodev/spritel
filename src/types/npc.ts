@@ -26,4 +26,6 @@ export interface NPCState {
   lastCollisionTime: number;
   movementState: NPCMovementState;
   currentTile: TilePosition;         // Current tile position
+  paused: boolean;
+  isInteracting: boolean;
 }

@@ -57,6 +57,7 @@ export class NPC {
     private homePosition: { x: number, y: number };
     private debugGraphics: Phaser.GameObjects.Graphics;
     private targetPosition: { x: number, y: number } | null = null;
+    private isInteracting: boolean = false;
 
     // Add these as private static constants at the top of the class
     private static readonly COLLISION_BOX_WIDTH = 28;  // Width of collision box
@@ -336,10 +337,19 @@ export class NPC {
             this.sprite.y
         );
 
-        const inRange = distance <= this.interactionRadius;
-        this.interactionZone.setVisible(inRange);
+        const playerInRange = distance <= this.interactionRadius;
+        this.interactionZone.setVisible(playerInRange);
+
+        if (playerInRange && !this.isInteracting) {
+            this.scene.getNetworkManager().sendInteractionStart(this.config.id);
+            this.isInteracting = true;
+        }
+        else if (!playerInRange && this.isInteracting) {
+            this.scene.getNetworkManager().sendInteractionEnd(this.config.id);
+            this.isInteracting = false;
+        }
         
-        return inRange;
+        return playerInRange;
     }
 
     public setState(newState: 'idle' | 'walking' | 'talking' | 'busy'): void {
@@ -530,4 +540,3 @@ function pixelsToTiles(x: number, y: number): { tileX: number, tileY: number } {
         tileY: Math.floor(y / TILE_SIZE)
     };
 }
-
