@@ -5,7 +5,6 @@ import { NPCState, TilePosition, NPCMovementState } from '../src/types/npc';
 const TILE_SIZE = 16; // Size of each tile in pixels
 const MAP_WIDTH_TILES = 24;
 const MAP_HEIGHT_TILES = 15;
-const NPC_BUFFER_TILES = 2; // Keep NPCs 2 tiles away from edges
 
 // Convert to pixels when needed
 const MAP_WIDTH = MAP_WIDTH_TILES * TILE_SIZE;
@@ -155,36 +154,6 @@ function generateNewPath(npc: NPCState): void {
   npc.state = 'walking';
   npc.facing = direction;
   npc.movementState.isMoving = false;
-}
-
-function chooseNewDirection(npc: NPCState): { x: number, y: number } {
-  const directions = [
-    { x: 0, y: -1 },    // up
-    { x: 0, y: 1 },     // down
-    { x: -1, y: 0 },    // left
-    { x: 1, y: 0 }      // right
-  ];
-
-  // Shuffle directions
-  for (let i = directions.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [directions[i], directions[j]] = [directions[j], directions[i]];
-  }
-
-  // Filter out directions that would move towards the map edge
-  const currentTilePos = pixelsToTiles(npc.x, npc.y);
-  const filteredDirections = directions.filter(dir => {
-    const newTile = {
-      tileX: currentTilePos.tileX + dir.x,
-      tileY: currentTilePos.tileY + dir.y
-    };
-    return newTile.tileX >= NPC_BUFFER_TILES && 
-           newTile.tileX < MAP_WIDTH_TILES - NPC_BUFFER_TILES &&
-           newTile.tileY >= NPC_BUFFER_TILES && 
-           newTile.tileY < MAP_HEIGHT_TILES - NPC_BUFFER_TILES;
-  });
-
-  return filteredDirections[Math.floor(Math.random() * filteredDirections.length)] || { x: 0, y: 0 };
 }
 
 function getFacingFromDirection(direction: { x: number, y: number }): 'up' | 'down' | 'left' | 'right' {

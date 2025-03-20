@@ -5,7 +5,7 @@ import GameScene from "../scenes/GameScene";
 const TILE_SIZE = 16; // Size of each tile in pixels
 const MAP_WIDTH_TILES = 24;
 const MAP_HEIGHT_TILES = 15;
-const NPC_BUFFER_TILES = 2; // Keep NPCs 2 tiles away from edges
+const NPC_BUFFER_TILES = 1; // Keep NPCs 1 tiles away from edges
 
 // Convert to pixels when needed
 const MAP_WIDTH = MAP_WIDTH_TILES * TILE_SIZE;
