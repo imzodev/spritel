@@ -57,6 +57,10 @@ export class NPC {
     private debugGraphics: Phaser.GameObjects.Graphics;
     private targetPosition: { x: number, y: number } | null = null;
 
+    // Add these as private static constants at the top of the class
+    private static readonly COLLISION_BOX_WIDTH = 28;  // Width of collision box
+    private static readonly COLLISION_BOX_HEIGHT = 28; // Height of collision box
+
     constructor(scene: GameScene, config: NPCConfig) {
         this.scene = scene;
         this.config = config;
@@ -84,15 +88,11 @@ export class NPC {
         const body = this.sprite.body as Phaser.Physics.Arcade.Body;
         body.setCollideWorldBounds(true);
         
-        // Adjust these values based on your sprite's actual size
-        const bodyWidth = 28;  // Width of collision box
-        const bodyHeight = 28; // Height of collision box
-        
         // Calculate offsets to center the collision box
-        const offsetX = (this.sprite.width - bodyWidth) / 2;
-        const offsetY = (this.sprite.height - bodyHeight);
+        const offsetX = (this.sprite.width - NPC.COLLISION_BOX_WIDTH) / 2;
+        const offsetY = (this.sprite.height - NPC.COLLISION_BOX_HEIGHT);
         
-        body.setSize(bodyWidth, bodyHeight);
+        body.setSize(NPC.COLLISION_BOX_WIDTH, NPC.COLLISION_BOX_HEIGHT);
         body.setOffset(offsetX, offsetY);
         
         body.setImmovable(true);
@@ -167,9 +167,14 @@ export class NPC {
                 this.interactionZone.setPosition(this.sprite.x, this.sprite.y);
             }
 
+            // Check for collisions before checking for target position
+            this.handleCollisions();
+            this.handleEdgeOfMap();
+    
+
             // Check if we've reached the target position
-            if (this.hasReachedTarget()) {
-                console.log(`[NPC ${this.config.id}] Reached target position`);
+            const hasReachedTarget = this.hasReachedTarget();
+            if (hasReachedTarget) {
                 this.isMoving = false;
                 this.state = 'idle';
                 this.updateAnimation();
@@ -182,10 +187,6 @@ export class NPC {
                 });
             }
         }
-        
-        // Update collision and animation
-        this.handleCollisions();
-        this.handleEdgeOfMap();
         this.updateAnimation();
 
         // Add at the end of existing update method
@@ -193,8 +194,6 @@ export class NPC {
     }
 
     private handleCollisions(): void {
-        if (!this.isMoving) return;
-        
         const body = this.sprite.body as Phaser.Physics.Arcade.Body;
         if (body.blocked.up || body.blocked.down || body.blocked.left || body.blocked.right) {
             this.isMoving = false;
@@ -215,29 +214,69 @@ export class NPC {
         }
     }
 
-        
+
+    
     private handleEdgeOfMap(): void {
-        if (!this.isMoving) return;
-
-        // Get tile coordinates
-        const { tileX, tileY } = pixelsToTiles(this.sprite.x, this.sprite.y);
-
-        // Check if NPC is within the buffer zone from the edge
-        const atTopEdge = tileY <= NPC_BUFFER_TILES;
-        const atBottomEdge = tileY >= MAP_HEIGHT_TILES - NPC_BUFFER_TILES - 1;
-        const atLeftEdge = tileX <= NPC_BUFFER_TILES;
-        const atRightEdge = tileX >= MAP_WIDTH_TILES - NPC_BUFFER_TILES - 1;
-
-        const npcOnTheEdge = atTopEdge || atBottomEdge || atLeftEdge || atRightEdge;
-
-        if (npcOnTheEdge) {
+        /*
+        * Improved edge detection logic but there are still issues determining the correct position of the NPC and determining the coordinates of the edges
+        */
+        const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+        const buffer = TILE_SIZE * NPC_BUFFER_TILES; // Buffer zone in pixels (16px)
+    
+        // Map boundaries in pixels
+        const mapLeft = 0;
+        const mapRight = MAP_WIDTH;   // 24 * 16 = 384
+        const mapTop = 0;
+        const mapBottom = MAP_HEIGHT; // 15 * 16 = 240
+    
+        // Calculate collision box boundaries centered on the sprite
+        const collisionLeft = this.sprite.x - (NPC.COLLISION_BOX_WIDTH / 2);
+        const collisionRight = this.sprite.x + (NPC.COLLISION_BOX_WIDTH / 2);
+        const collisionTop = this.sprite.y - NPC.COLLISION_BOX_HEIGHT;
+        const collisionBottom = this.sprite.y - NPC.COLLISION_BOX_HEIGHT;
+    
+        // Check if NPC is at or beyond the map edges (including buffer)
+        const atLeftEdge = collisionLeft <= mapLeft + buffer;
+        const atRightEdge = collisionRight >= mapRight - buffer;
+        const atTopEdge = collisionTop <= mapTop + buffer;
+        const atBottomEdge = collisionBottom >= mapBottom - buffer;
+    
+        
+    
+        // If NPC is at any edge
+        if (atLeftEdge || atRightEdge || atTopEdge || atBottomEdge) {
+            // Debug logging for edge detection
+            console.log('Edge Check:', {
+                spriteX: this.sprite.x,
+                spriteY: this.sprite.y,
+                collisionLeft,
+                collisionRight,
+                collisionTop,
+                collisionBottom,
+                atLeftEdge,
+                atRightEdge,
+                atTopEdge,
+                atBottomEdge,
+                mapWidth: MAP_WIDTH,
+                mapHeight: MAP_HEIGHT,
+                buffer
+            });
             this.isMoving = false;
             this.state = 'idle';
-            
-            // Stop the NPC's movement
-            const body = this.sprite.body as Phaser.Physics.Arcade.Body;
-            body.setVelocity(0, 0);
-            // Notify server through NetworkManager
+            body.setVelocity(0, 0); // Stop all movement
+    
+            // Clamp position to keep NPC within bounds (including buffer)
+            if (atLeftEdge) this.sprite.x = mapLeft + buffer + (NPC.COLLISION_BOX_WIDTH / 2);
+            if (atRightEdge) this.sprite.x = mapRight - buffer - (NPC.COLLISION_BOX_WIDTH / 2);
+            if (atTopEdge) this.sprite.y = mapTop + buffer + NPC.COLLISION_BOX_HEIGHT;
+            if (atBottomEdge) this.sprite.y = mapBottom - buffer;
+    
+            // Update interaction zone position after clamping
+            if (this.interactionZone) {
+                this.interactionZone.setPosition(this.sprite.x, this.sprite.y);
+            }
+    
+            // Notify server of edge event
             this.scene.getNetworkManager().sendNPCMapEdge({
                 npcId: this.getId(),
                 edges: { up: atTopEdge, down: atBottomEdge, left: atLeftEdge, right: atRightEdge },
@@ -246,8 +285,8 @@ export class NPC {
                 y: this.sprite.y,
                 facing: this.facing
             });
-
-            console.log(`[NPC ${this.config.id}] Reached map edge at (${tileX}, ${tileY}) facing ${this.facing}`);
+    
+            console.log(`[NPC ${this.config.id}] Stopped at map edge: (${this.sprite.x}, ${this.sprite.y})`);
         }
     }
 
@@ -427,7 +466,8 @@ export class NPC {
         else if (data.facing === 'down') body.setVelocity(0, speed);
         else if (data.facing === 'left') body.setVelocity(-speed, 0);
         else if (data.facing === 'right') body.setVelocity(speed, 0);
-        
+        // Log velocity for debugging
+        console.log(`[NPC ${this.config.id}] Velocity set to (${body.velocity.x}, ${body.velocity.y})`);
         this.updateAnimation();
     }
 

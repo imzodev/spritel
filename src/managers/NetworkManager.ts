@@ -18,7 +18,7 @@ export class NetworkManager extends EventTarget {
 
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      console.log('[NetworkManager] Received message:', data);
+      // console.log('[NetworkManager] Received message:', data);
       this.handleMessage(data);
     };
 
@@ -100,7 +100,6 @@ export class NetworkManager extends EventTarget {
         type: 'npc-collision',
         ...data
       };
-      console.log('[NetworkManager] Sending message:', message); // Debug log
       this.ws.send(JSON.stringify(message));
     }
   }
