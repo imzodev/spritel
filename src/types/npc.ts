@@ -1,3 +1,5 @@
+import { NPC_PERSONALITIES } from '../data/npc-personalities';
+
 export interface TilePosition {
   tileX: number;
   tileY: number;
@@ -12,6 +14,7 @@ export interface NPCMovementState {
 
 export interface NPCState {
   id: string;
+  name: string;
   x: number;
   y: number;
   texture: string;
@@ -27,5 +30,6 @@ export interface NPCState {
   movementState: NPCMovementState;
   currentTile: TilePosition;         // Current tile position
   paused: boolean;
+  personalityType: keyof typeof NPC_PERSONALITIES;
   isInteracting: boolean;
 }

@@ -27,6 +27,8 @@ function tilesToPixels(tileX: number, tileY: number): { x: number, y: number } {
 
 export interface NPCConfig {
     id: string;
+    name: string;
+    personalityType: string;
     x: number;
     y: number;
     texture: string;
@@ -326,6 +328,7 @@ export class NPC {
         const gameScene = this.scene as GameScene;
         const player = gameScene.getPlayer();
         if (!player) {
+            console.log('[NPC] No player found');
             return false;
         }
 
@@ -340,16 +343,32 @@ export class NPC {
         const playerInRange = distance <= this.interactionRadius;
         this.interactionZone.setVisible(playerInRange);
 
-        if (playerInRange && !this.isInteracting) {
-            this.scene.getNetworkManager().sendInteractionStart(this.config.id);
-            this.isInteracting = true;
+        if (!playerInRange && this.isInteracting) {
+            this.endInteraction();
         }
-        else if (!playerInRange && this.isInteracting) {
-            this.scene.getNetworkManager().sendInteractionEnd(this.config.id);
-            this.isInteracting = false;
-        }
-        
+
+        // Only update interaction zone visibility based on range
+        // Don't set isInteracting here
         return playerInRange;
+    }
+
+    // Add new method to handle interaction state
+    public startInteraction(): void {
+        if (!this.isInteracting) {
+            console.log('[NPC] Starting interaction with:', this.config.name);
+            this.scene.getNetworkManager().sendInteractionStart(this.config.id );
+            this.isInteracting = true;
+            this.setState('talking');
+        }
+    }
+
+    public endInteraction(): void {
+        if (this.isInteracting) {
+            console.log('[NPC] Ending interaction with:', this.config.name);
+            this.scene.getNetworkManager().sendInteractionEnd(this.config.id );
+            this.isInteracting = false;
+            this.setState('idle');
+        }
     }
 
     public setState(newState: 'idle' | 'walking' | 'talking' | 'busy'): void {

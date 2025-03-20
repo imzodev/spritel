@@ -65,9 +65,11 @@ function updateNPCPosition(npcId: string, npc: NPCState, oldMapCoords?: { x: num
 
 // Initialize default NPCs with complete configuration
 function initializeNPCs() {
-  // Create the merchant NPC
+  // Create the merchant NPC with additional properties
   const merchant: NPCState = {
     id: 'merchant',
+    name: 'Marcus', // Add name from npc-personalities.ts
+    personalityType: 'merchant', // Add personality type
     x: 200,
     y: 70,
     texture: 'npc_1',
@@ -87,7 +89,7 @@ function initializeNPCs() {
       targetTile: null
     },
     currentTile: pixelsToTiles(200, 70),
-    paused: false, // Add paused state
+    paused: false,
     isInteracting: false
   };
 

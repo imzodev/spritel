@@ -335,7 +335,6 @@ export default class GameScene extends Phaser.Scene {
         });
 
         this.networkManager.on('player-update', (data) => {
-           
             
             if (!data.player.id || data.player.id === this.player.getId()) {
                 console.log('[NetworkHandler] Ignoring update for self');
@@ -397,6 +396,8 @@ export default class GameScene extends Phaser.Scene {
                 if (!this.npcManager.getNPC(npcData.id)) {
                     const npcConfig = {
                         id: npcData.id,
+                        name: npcData.name,
+                        personalityType: npcData.personalityType,
                         x: npcData.x,
                         y: npcData.y,
                         texture: npcData.texture,
@@ -746,6 +747,8 @@ export default class GameScene extends Phaser.Scene {
                     const npc = npcsInRange[0];
                     npc.setState('talking');
                     console.log('Interacting with NPC:', npc);
+                    // Add this line to properly trigger the interaction
+                    this.handleNPCInteraction(npc);
                 }
             }
         }
@@ -788,5 +791,45 @@ export default class GameScene extends Phaser.Scene {
         
         const [_, x, y] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
         return parseInt(x) === otherMapPosition.x && parseInt(y) === otherMapPosition.y;
+    }
+
+    public handleNPCInteraction(npc: NPC): void {
+        console.log('[GameScene] handleNPCInteraction called with NPC config:', npc.config);
+        
+        // Start the interaction and emit the event
+        npc.startInteraction();
+        
+        const context = {
+            timeOfDay: 'day', // For now, hardcode or implement getTimeOfDay() if needed
+            weather: 'clear', // For now, hardcode or implement getCurrentWeather() if needed
+            playerLevel: this.player?.level || 1,
+            location: 'village', // For now, hardcode or implement getCurrentLocation() if needed
+            activeQuests: [] // Empty array for now
+        };
+
+        const eventData = {
+            npcId: npc.config.id,
+            npcName: npc.config.name,
+            personalityType: npc.config.personalityType,
+            context
+        };
+
+        console.log('[GameScene] Emitting npcInteraction event with data:', eventData);
+        this.events.emit("npcInteraction", eventData);
+    }
+
+    private getTimeOfDay(): string {
+        // Implement based on your game's time system
+        return "morning";
+    }
+
+    private getCurrentWeather(): string {
+        // Implement based on your weather system
+        return "clear";
+    }
+
+    private getCurrentLocation(): string {
+        // Implement based on your map system
+        return "village_square";
     }
 }
