@@ -55,6 +55,7 @@ export class NPC {
     private movementProgress: number = 0;
     private homePosition: { x: number, y: number };
     private debugGraphics: Phaser.GameObjects.Graphics;
+    private targetPosition: { x: number, y: number } | null = null;
 
     constructor(scene: GameScene, config: NPCConfig) {
         this.scene = scene;
@@ -137,8 +138,7 @@ export class NPC {
     }
 
     public update(): void {
-        if (this.isMoving && this.stepsRemaining > 0) {
-
+        if (this.isMoving) {
             const speed = (16 * this.moveSpeed) / 60; // Convert to pixels per frame
             let velocityX = 0;
             let velocityY = 0;
@@ -167,21 +167,19 @@ export class NPC {
                 this.interactionZone.setPosition(this.sprite.x, this.sprite.y);
             }
 
-            // Check if we've completed a tile movement
-            if (this.hasCompletedTileMovement()) {
-                this.stepsRemaining--;
-                if (this.stepsRemaining <= 0) {
-                    console.log(`[NPC ${this.config.id}] Completed tile movement`);
-                    this.isMoving = false;
-                    this.state = 'idle';
-                    this.updateAnimation();
-                    // Replace game events with NetworkManager
-                    this.scene.getNetworkManager().sendNPCMovementComplete({
-                        npcId: this.config.id,
-                        x: this.sprite.x,
-                        y: this.sprite.y
-                    });
-                }
+            // Check if we've reached the target position
+            if (this.hasReachedTarget()) {
+                console.log(`[NPC ${this.config.id}] Reached target position`);
+                this.isMoving = false;
+                this.state = 'idle';
+                this.updateAnimation();
+                
+                // Notify server that movement is complete
+                this.scene.getNetworkManager().sendNPCMovementComplete({
+                    npcId: this.config.id,
+                    x: this.sprite.x,
+                    y: this.sprite.y
+                });
             }
         }
         
@@ -412,48 +410,35 @@ export class NPC {
 
     private handleMovementInstruction(data: {
         npcId: string,
-        direction: string,
-        steps: number,
+        targetX: number,
+        targetY: number,
         facing: string,
         state: string
     }): void {
-        
         this.isMoving = true;
-        this.stepsRemaining = data.steps;
-        this.currentDirection = data.direction;
         this.facing = data.facing;
         this.state = data.state;
         
-        // Set velocity based on direction
-        const speed = 1; // Adjust as needed
+        const speed = 60; // Pixels per second
         const body = this.sprite.body as Phaser.Physics.Arcade.Body;
-        
-        switch (this.currentDirection) {
-            case 'up':
-                body.setVelocity(0, -speed);
-                break;
-            case 'down':
-                body.setVelocity(0, speed);
-                break;
-            case 'left':
-                body.setVelocity(-speed, 0);
-                break;
-            case 'right':
-                body.setVelocity(speed, 0);
-                break;
-        }
+
+        // Simple velocity setting based on direction
+        if (data.facing === 'up') body.setVelocity(0, -speed);
+        else if (data.facing === 'down') body.setVelocity(0, speed);
+        else if (data.facing === 'left') body.setVelocity(-speed, 0);
+        else if (data.facing === 'right') body.setVelocity(speed, 0);
         
         this.updateAnimation();
     }
 
-    private hasCompletedTileMovement(): boolean {
-        const tileSize = 16; // Your tile size
-        const tileX = Math.round(this.sprite.x / tileSize);
-        const tileY = Math.round(this.sprite.y / tileSize);
-        const centerX = tileX * tileSize;
-        const centerY = tileY * tileSize;
+    private hasReachedTarget(): boolean {
+        // Allow for a small threshold of error in position matching
+        const threshold = 1;
+        const targetX = this.targetPosition?.x ?? this.sprite.x;
+        const targetY = this.targetPosition?.y ?? this.sprite.y;
         
-        return Math.abs(this.sprite.x - centerX) < 1 && Math.abs(this.sprite.y - centerY) < 1;
+        return Math.abs(this.sprite.x - targetX) < threshold && 
+               Math.abs(this.sprite.y - targetY) < threshold;
     }
 
     private drawDebugTiles(): void {

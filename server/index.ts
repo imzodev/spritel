@@ -133,30 +133,44 @@ function generateNewPath(npc: NPCState): void {
     return;
   }
 
+  // Get current position
+  const currentX = npc.x;
+  const currentY = npc.y;
+  
+  // Define possible directions excluding current facing direction
   const directions: ("up" | "down" | "left" | "right")[] = ['up', 'down', 'left', 'right'];
-  // Filter out the current facing direction
   const availableDirections = directions.filter(dir => dir !== npc.facing);
-  const direction = availableDirections[Math.floor(Math.random() * availableDirections.length)];
-  const steps = Math.floor(Math.random() * 3) + 2; // 2-4 steps
+  const newDirection = availableDirections[Math.floor(Math.random() * availableDirections.length)];
+  
+  // Calculate target coordinates based on direction
+  const distance = (Math.floor(Math.random() * 3) + 2) * TILE_SIZE; // 2-4 tiles worth of distance
+  let targetX = currentX;
+  let targetY = currentY;
 
-  console.log(`[Server] Sending movement instruction for NPC ${npc.id}:`, {
-    direction,
-    steps,
-    state: 'walking'
+  switch (newDirection) {
+    case 'up': targetY -= distance; break;
+    case 'down': targetY += distance; break;
+    case 'left': targetX -= distance; break;
+    case 'right': targetX += distance; break;
+  }
+
+  console.log(`[Server] Generated path for NPC ${npc.id}:`, {
+    from: { x: currentX, y: currentY },
+    to: { x: targetX, y: targetY },
+    direction: newDirection
   });
 
   broadcast({
     type: 'npc-movement-instruction',
     npcId: npc.id,
-    direction: direction,
-    steps: steps,
-    facing: direction,
+    targetX: targetX,
+    targetY: targetY,
+    facing: newDirection,
     state: 'walking'
   });
 
-  // Update NPC state
   npc.state = 'walking';
-  npc.facing = direction;
+  npc.facing = newDirection;
   npc.movementState.isMoving = false;
 }
 
