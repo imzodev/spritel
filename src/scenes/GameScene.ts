@@ -92,11 +92,6 @@ export default class GameScene extends Phaser.Scene {
             console.error("Keyboard input not available");
         }
 
-        // Listen for NPC collision events
-        this.game.events.on('npc-collision', (data: { npcId: string, collision: any }) => {
-            console.log('[GameScene] NPC collision detected:', data); // Debug log
-            this.networkManager.sendNPCCollision(data.npcId, data.collision);
-        });
     }
 
     private initializeControls(): void {

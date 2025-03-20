@@ -26,6 +26,8 @@ interface Player {
   mapPosition: { x: number; y: number };
 }
 
+type Direction =  "right" | "left" | "up" | "down";  
+
 interface GameState {
   players: Map<string, Player>;
 }
@@ -124,7 +126,7 @@ function initializeNPCMovement(): NPCMovementState {
 }
 
 function generateNewPath(npc: NPCState): void {
-  console.log('[Server] Attempting to generate new path for NPC:', npc.id);
+  console.log(`[Server] Attempting to generate new path for NPC ${npc.id} currently facing ${npc.facing}`);
 
   if (npc.movementState.isMoving) {
     console.log(`[Server] NPC ${npc.id} is already moving, skipping`);
@@ -132,7 +134,9 @@ function generateNewPath(npc: NPCState): void {
   }
 
   const directions: ("up" | "down" | "left" | "right")[] = ['up', 'down', 'left', 'right'];
-  const direction = directions[Math.floor(Math.random() * directions.length)];
+  // Filter out the current facing direction
+  const availableDirections = directions.filter(dir => dir !== npc.facing);
+  const direction = availableDirections[Math.floor(Math.random() * availableDirections.length)];
   const steps = Math.floor(Math.random() * 3) + 2; // 2-4 steps
 
   console.log(`[Server] Sending movement instruction for NPC ${npc.id}:`, {
@@ -404,7 +408,7 @@ function handleNPCMovementComplete(data: { npcId: string, x: number, y: number }
     }, 1000);
 }
 
-function handleNPCCollision(data: { npcId: string, collision: { up: boolean, down: boolean, left: boolean, right: boolean }, currentTile: { x: number, y: number }, x: number, y: number}): void {
+function handleNPCCollision(data: { npcId: string, collision: { up: boolean, down: boolean, left: boolean, right: boolean }, currentTile: { x: number, y: number }, x: number, y: number, facing: Direction}): void {
   console.log(`[Server] NPC ${data.npcId} collision detected`);
   const npc = npcStates.get(data.npcId);
   if (!npc) return;
@@ -414,6 +418,7 @@ function handleNPCCollision(data: { npcId: string, collision: { up: boolean, dow
   npc.isColliding = true;
   npc.movementState.isMoving = false;
   npc.state = 'idle';
+  npc.facing = data.facing;
 
   // Clear collision state and try new direction after 1 second
   setTimeout(() => {

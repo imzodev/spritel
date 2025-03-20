@@ -210,7 +210,8 @@ export class NPC {
         if (body.blocked.up || body.blocked.down || body.blocked.left || body.blocked.right) {
             this.isMoving = false;
             this.state = 'idle';
-            this.scene.game.events.emit('npc-collision', {
+            console.log(`[NPC ${this.config.id}] Collision detected, stopping movement facing: ${this.facing}`);
+            this.scene.getNetworkManager().sendNPCCollision({
                 npcId: this.getId(),
                 collision: {
                     up: body.blocked.up,
@@ -220,7 +221,8 @@ export class NPC {
                 },
                 currentTile: pixelsToTiles(this.sprite.x, this.sprite.y),
                 x: this.sprite.x,
-                y: this.sprite.y
+                y: this.sprite.y,
+                facing: this.facing
             });
         }
     }
@@ -247,18 +249,17 @@ export class NPC {
             // Stop the NPC's movement
             const body = this.sprite.body as Phaser.Physics.Arcade.Body;
             body.setVelocity(0, 0);
-
             // Notify server through NetworkManager
             this.scene.getNetworkManager().sendNPCMapEdge({
                 npcId: this.getId(),
                 edges: { up: atTopEdge, down: atBottomEdge, left: atLeftEdge, right: atRightEdge },
-                currentTile: { tileX, tileY },
+                currentTile: pixelsToTiles(this.sprite.x, this.sprite.y),
                 x: this.sprite.x,
                 y: this.sprite.y,
                 facing: this.facing
             });
 
-            console.log(`[NPC ${this.config.id}] Reached map edge at (${tileX}, ${tileY})`);
+            console.log(`[NPC ${this.config.id}] Reached map edge at (${tileX}, ${tileY}) facing ${this.facing}`);
         }
     }
 
@@ -389,6 +390,7 @@ export class NPC {
         // Remove the event listener
         this.scene.getNetworkManager().off('npc-movement-instruction', this.handleMovementInstruction);
         this.scene.getNetworkManager().off('npc-collision', this.handleCollisions);
+        this.scene.getNetworkManager().off('npc-map-edge', this.handleEdgeOfMap);
         
         // Remove all colliders if they exist
         if (this.colliders && Array.isArray(this.colliders)) {
@@ -428,7 +430,7 @@ export class NPC {
         this.state = data.state;
         
         // Set velocity based on direction
-        const speed = 60; // Adjust as needed
+        const speed = 1; // Adjust as needed
         const body = this.sprite.body as Phaser.Physics.Arcade.Body;
         
         switch (this.currentDirection) {
