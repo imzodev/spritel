@@ -132,7 +132,7 @@ function generateNewPath(npc: NPCState): void {
     return;
   }
 
-  const directions = ['up', 'down', 'left', 'right'];
+  const directions: ("up" | "down" | "left" | "right")[] = ['up', 'down', 'left', 'right'];
   const direction = directions[Math.floor(Math.random() * directions.length)];
   const steps = Math.floor(Math.random() * 3) + 2; // 2-4 steps
 
@@ -154,19 +154,7 @@ function generateNewPath(npc: NPCState): void {
   // Update NPC state
   npc.state = 'walking';
   npc.facing = direction;
-  // npc.movementState.isMoving = true;
-}
-
-function handleNPCMovementComplete(npcId: string): void {
-  console.log(`[Server] NPC ${npcId} completed movement`);
-  const npc = npcStates.get(npcId);
-  if (!npc) return;
-  
   npc.movementState.isMoving = false;
-  npc.state = 'idle';
-  
-  // Generate new path immediately
-  generateNewPath(npc);
 }
 
 function chooseNewDirection(npc: NPCState): { x: number, y: number } {
@@ -272,6 +260,27 @@ const server = Bun.serve<{ id: string }>({
       const data = JSON.parse(String(message));
       const playerId = ws.data.id;
 
+      if (data.type === 'request-npc-states') {
+        const mapPosition = data.mapPosition;
+        const mapKey = getMapKey(mapPosition.x, mapPosition.y);
+        const npcIds = npcStatesByMap.get(mapKey);
+        const npcs: NPCState[] = [];
+        if (npcIds) {
+          npcIds.forEach((id) => {
+            const npcState = npcStates.get(id);
+            if (npcState) {
+              npcs.push(npcState);
+            }
+          });
+        }
+        console.log(`[Server] Sending NPC states for map (${mapPosition.x}, ${mapPosition.y}):`, npcs);
+        ws.send(JSON.stringify({
+          type: 'npc-states',
+          npcs: npcs
+        }));
+        return;
+      }
+
       switch (data.type) {
         case "player-update":
           const player = state.players.get(playerId);
@@ -339,10 +348,10 @@ const server = Bun.serve<{ id: string }>({
           break;
         }
         case "npc-movement-complete":
-          handleNPCMovementComplete(data.npcId);
+          handleNPCMovementComplete(data);
           break;
         case "npc-collision":
-          handleNPCCollision(data.npcId);
+          handleNPCCollision(data);
           break;
       }
     },
@@ -402,11 +411,27 @@ function broadcast(
 
 console.log(`WebSocket server running on port ${server.port}`);
 
-function handleNPCCollision(npcId: string): void {
-  console.log(`[Server] NPC ${npcId} collision detected`);
+function handleNPCMovementComplete(data: { npcId: string, x: number, y: number }): void {
+  const { npcId, x, y } = data;
+  console.log(`[Server] NPC ${npcId} movement completed. Updating position to (${x}, ${y})`);
   const npc = npcStates.get(npcId);
   if (!npc) return;
+  npc.x = x;
+  npc.y = y;
+  npc.currentTile = pixelsToTiles(x, y);
+  npc.movementState.isMoving = false;
+  npc.state = 'idle';
+  // Generate a new movement path
+  generateNewPath(npc);
+}
 
+function handleNPCCollision(data: { npcId: string, collision: { up: boolean, down: boolean, left: boolean, right: boolean }, currentTile: { x: number, y: number }, x: number, y: number}): void {
+  console.log(`[Server] NPC ${data.npcId} collision detected`);
+  const npc = npcStates.get(data.npcId);
+  if (!npc) return;
+  npc.x = data.x;
+  npc.y = data.y;
+  npc.currentTile = pixelsToTiles(data.x, data.y);
   npc.isColliding = true;
   npc.movementState.isMoving = false;
   npc.state = 'idle';

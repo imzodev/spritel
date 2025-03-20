@@ -107,6 +107,18 @@ export class NetworkManager extends EventTarget {
     }
   }
 
+  /* Added new method to send NPC movement completion to the server */
+  public sendNPCMovementComplete(data: { npcId: string, x: number, y: number }): void {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'npc-movement-complete',
+        npcId: data.npcId,
+        x: data.x,
+        y: data.y
+      }));
+    }
+  }
+
   private handleMessage(message: any): void {
     // Dispatch the event
     this.dispatchEvent(new CustomEvent(message.type, { detail: message }));

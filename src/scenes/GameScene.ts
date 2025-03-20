@@ -314,24 +314,13 @@ export default class GameScene extends Phaser.Scene {
     }
 
     public restoreNPCs(mapPosition: { x: number, y: number }): void {
-        // First check if NPC already exists
-        if (mapPosition.x === 0 && mapPosition.y === 0 && !this.npcManager.getNPC('merchant')) {
-            const npcConfig = {
-                id: 'merchant',
-                x: 100,
-                y: 100,
-                texture: 'npc_1',
-                scale: 0.5,
-                interactionRadius: 50,
-                defaultAnimation: 'npc_1_idle_down',
-                mapCoordinates: { x: 0, y: 0 }
-            };
-            this.npcManager.createNPC(npcConfig);
-            console.log('[GameScene] Merchant NPC created');
+        if (mapPosition.x === 0 && mapPosition.y === 0) {
+            this.networkManager.requestNPCStates(mapPosition);
+            console.log('[GameScene] Requested NPC states for map', mapPosition);
         }
     }
 
-    private setupNetworkHandlers(): void {
+    public setupNetworkHandlers(): void {
         this.networkManager.on('game-state', (data) => {
             console.log('Received game-state:', data);
             // First game state received - set our player's ID but keep our position
@@ -428,6 +417,22 @@ export default class GameScene extends Phaser.Scene {
             const npc = this.npcManager.getNPC(data.npc.id);
             if (npc) {
                 npc.updateFromNetwork(data.npc);
+            }
+        });
+
+        this.networkManager.on('npc-states', (message: any) => {
+            console.log('[GameScene] Received NPC states:', message);
+            // Assuming message.npcs is an array of NPC configurations
+            if (message && message.npcs && Array.isArray(message.npcs)) {
+                message.npcs.forEach((npcConfig: any) => {
+                    if (!this.npcManager.getNPC(npcConfig.id)) {
+                        this.npcManager.createNPC(npcConfig);
+                        console.log(`[GameScene] Created NPC: ${npcConfig.id}`);
+                    } else {
+                        this.npcManager.updateNPC(npcConfig);
+                        console.log(`[GameScene] Updated NPC: ${npcConfig.id}`);
+                    }
+                });
             }
         });
     }

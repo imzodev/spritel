@@ -179,7 +179,7 @@ export class NPC {
                     this.isMoving = false;
                     this.state = 'idle';
                     this.updateAnimation();
-                    this.scene.game.events.emit('npc-movement-complete', this.config.id);
+                    this.scene.game.events.emit('npc-movement-complete', { npcId: this.config.id, x: this.sprite.x, y: this.sprite.y });
                 }
             }
         }
@@ -204,7 +204,9 @@ export class NPC {
                     left: body.blocked.left,
                     right: body.blocked.right
                 },
-                currentTile: pixelsToTiles(this.sprite.x, this.sprite.y)
+                currentTile: pixelsToTiles(this.sprite.x, this.sprite.y),
+                x: this.sprite.x,
+                y: this.sprite.y
             });
         }
     }
