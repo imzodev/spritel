@@ -350,6 +350,9 @@ const server = Bun.serve<{ id: string }>({
         case "npc-movement-complete":
           handleNPCMovementComplete(data);
           break;
+        case "npc-map-edge":
+          handleNPCMapEdge(data);
+          break;
         case "npc-collision":
           handleNPCCollision(data);
           break;
@@ -452,57 +455,33 @@ function getFacingFromVelocity(velocity: { x: number, y: number }): 'up' | 'down
   }
 }
 
-function handleNPCMapEdge(npcId: string, edges: { up: boolean, down: boolean, left: boolean, right: boolean }) {
+function handleNPCMapEdge(data: { npcId: string, edges: { up: boolean, down: boolean, left: boolean, right: boolean }, currentTile: { x: number, y: number }, x: number, y: number, facing: string }) {
+  const { npcId, edges, currentTile, x, y, facing } = data;
   const npc = npcStates.get(npcId);
   if (!npc) return;
-
+  npc.x = x;
+  npc.y = y;
+  npc.currentTile = pixelsToTiles(x, y);
+  // npc.facing = facing;
+  npc.movementState.isMoving = false;
+  npc.state = 'idle';
   console.log(`[Server] NPC ${npcId} reached map edge:`, edges);
   
   // Immediately stop the NPC
   npc.currentVelocity = { x: 0, y: 0 };
-  npc.state = 'idle';
-
-  // Broadcast the stopped state immediately
-  broadcast({
-    type: 'npc-update',
-    npc: npc
-  });
 
   // Wait before choosing new direction
   setTimeout(() => {
     if (!npc) return;
     
-    // Choose a new direction avoiding the edges
-    const possibleDirections = [
-      { x: 0, y: 1 },   // down
-      { x: 0, y: -1 },  // up
-      { x: 1, y: 0 },   // right
-      { x: -1, y: 0 }   // left
-    ].filter(dir => {
-      if (edges.up && dir.y < 0) return false;
-      if (edges.down && dir.y > 0) return false;
-      if (edges.left && dir.x < 0) return false;
-      if (edges.right && dir.x > 0) return false;
-      return true;
-    });
-
-    if (possibleDirections.length > 0) {
-      const newDir = possibleDirections[Math.floor(Math.random() * possibleDirections.length)];
-      npc.currentVelocity = newDir;
-      npc.state = 'walking';
-      npc.facing = getFacingFromVelocity(newDir);
-      
-      broadcast({
-        type: 'npc-update',
-        npc: npc
-      });
-    }
+    // Generate a new path
+    generateNewPath(npc);
   }, 2000);
 }
 
 
 // Make sure movement generation happens regularly
-setInterval(() => {
+setTimeout(() => {
   console.log('[Server] Checking NPCs for movement updates');
   npcStates.forEach((npc, id) => {
     console.log(`[Server] NPC ${id} state:`, {
@@ -513,4 +492,4 @@ setInterval(() => {
       generateNewPath(npc);
     }
   });
-}, 3000); // Every 3 seconds
+}, 5000); // Every 3 seconds

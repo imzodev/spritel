@@ -1,13 +1,21 @@
 import Phaser from "phaser";
 import GameScene from "../scenes/GameScene";
 
+// Constants for tile-based calculations
+const TILE_SIZE = 16; // Size of each tile in pixels
+const MAP_WIDTH_TILES = 24;
+const MAP_HEIGHT_TILES = 15;
+const NPC_BUFFER_TILES = 2; // Keep NPCs 2 tiles away from edges
+
+// Convert to pixels when needed
+const MAP_WIDTH = MAP_WIDTH_TILES * TILE_SIZE;
+const MAP_HEIGHT = MAP_HEIGHT_TILES * TILE_SIZE;
+
 // Add these interfaces and constants
 interface TilePosition {
     tileX: number;
     tileY: number;
 }
-
-const TILE_SIZE = 16;
 
 function tilesToPixels(tileX: number, tileY: number): { x: number, y: number } {
     return {
@@ -186,6 +194,7 @@ export class NPC {
         
         // Update collision and animation
         this.handleCollisions();
+        this.handleEdgeOfMap();
         this.updateAnimation();
     }
 
@@ -208,6 +217,38 @@ export class NPC {
                 x: this.sprite.x,
                 y: this.sprite.y
             });
+        }
+    }
+
+        
+    private handleEdgeOfMap(): void {
+        if (!this.isMoving) return;
+    
+        // Get tile coordinates
+        const { tileX, tileY } = pixelsToTiles(this.sprite.x, this.sprite.y);
+    
+        // Check if NPC is within the buffer zone from the edge
+        const atTopEdge = tileY <= NPC_BUFFER_TILES;
+        const atBottomEdge = tileY >= MAP_HEIGHT_TILES - NPC_BUFFER_TILES - 1;
+        const atLeftEdge = tileX <= NPC_BUFFER_TILES;
+        const atRightEdge = tileX >= MAP_WIDTH_TILES - NPC_BUFFER_TILES - 1;
+    
+        const npcOnTheEdge = atTopEdge || atBottomEdge || atLeftEdge || atRightEdge;
+    
+        if (npcOnTheEdge) {
+            this.isMoving = false;
+            this.state = 'idle';
+    
+            // Emit event with edge information
+            this.scene.game.events.emit('npc-map-edge', {
+                npcId: this.getId(),
+                edges: { up: atTopEdge, down: atBottomEdge, left: atLeftEdge, right: atRightEdge },
+                currentTile: { tileX, tileY },
+                x: this.sprite.x,
+                y: this.sprite.y
+            });
+    
+            console.log(`[NPC ${this.config.id}] Reached map edge at (${tileX}, ${tileY})`);
         }
     }
 
@@ -337,6 +378,7 @@ export class NPC {
     public destroy(): void {
         // Remove the event listener
         this.scene.getNetworkManager().off('npc-movement-instruction', this.handleMovementInstruction);
+        this.scene.getNetworkManager().off('npc-collision', this.handleCollisions);
         
         // Remove all colliders if they exist
         if (this.colliders && Array.isArray(this.colliders)) {
