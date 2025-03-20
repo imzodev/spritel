@@ -54,6 +54,7 @@ export class NPC {
     private currentTileIndex: number = 0;
     private movementProgress: number = 0;
     private homePosition: { x: number, y: number };
+    private debugGraphics: Phaser.GameObjects.Graphics;
 
     constructor(scene: GameScene, config: NPCConfig) {
         this.scene = scene;
@@ -126,6 +127,13 @@ export class NPC {
 
         // Store initial position as home position
         this.homePosition = { x: config.x, y: config.y };
+
+        // Create debug graphics
+        this.debugGraphics = scene.add.graphics();
+        this.debugGraphics.setDepth(1); // Set depth to be above ground but below sprites
+        
+        // Initial debug draw
+        this.drawDebugTiles();
     }
 
     public update(): void {
@@ -181,6 +189,9 @@ export class NPC {
         this.handleCollisions();
         this.handleEdgeOfMap();
         this.updateAnimation();
+
+        // Add at the end of existing update method
+        this.drawDebugTiles();
     }
 
     private handleCollisions(): void {
@@ -387,6 +398,11 @@ export class NPC {
         if (this.interactionZone) {
             this.interactionZone.destroy();
         }
+
+        // Add to existing destroy method
+        if (this.debugGraphics) {
+            this.debugGraphics.destroy();
+        }
     }
 
     private getAnimationKey(): string {
@@ -438,6 +454,43 @@ export class NPC {
         const centerY = tileY * tileSize;
         
         return Math.abs(this.sprite.x - centerX) < 1 && Math.abs(this.sprite.y - centerY) < 1;
+    }
+
+    private drawDebugTiles(): void {
+        this.debugGraphics.clear();
+
+        // Get current NPC position in tiles
+        const { tileX, tileY } = pixelsToTiles(this.sprite.x, this.sprite.y);
+
+        // Draw a 5x5 grid centered on the NPC
+        for (let y = tileY - 2; y <= tileY + 2; y++) {
+            for (let x = tileX - 2; x <= tileX + 2; x++) {
+                // Different colors for different zones
+                let color = 0x00ff00; // Default green for safe tiles
+                let alpha = 0.2;
+
+                // Edge buffer zone
+                if (x <= NPC_BUFFER_TILES || 
+                    x >= MAP_WIDTH_TILES - NPC_BUFFER_TILES - 1 ||
+                    y <= NPC_BUFFER_TILES || 
+                    y >= MAP_HEIGHT_TILES - NPC_BUFFER_TILES - 1) {
+                    color = 0xff0000; // Red for buffer zone
+                    alpha = 0.3;
+                }
+
+                // Current tile
+                if (x === tileX && y === tileY) {
+                    color = 0x0000ff; // Blue for current tile
+                    alpha = 0.4;
+                }
+
+                // Draw tile
+                this.debugGraphics.lineStyle(1, 0x000000, 0.5);
+                this.debugGraphics.fillStyle(color, alpha);
+                this.debugGraphics.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                this.debugGraphics.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+        }
     }
 }
 function pixelsToTiles(x: number, y: number): { tileX: number, tileY: number } {
