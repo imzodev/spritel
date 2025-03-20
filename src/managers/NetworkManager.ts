@@ -107,7 +107,6 @@ export class NetworkManager extends EventTarget {
     }
   }
 
-  /* Added new method to send NPC movement completion to the server */
   public sendNPCMovementComplete(data: { npcId: string, x: number, y: number }): void {
     if (this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({
@@ -115,6 +114,22 @@ export class NetworkManager extends EventTarget {
         npcId: data.npcId,
         x: data.x,
         y: data.y
+      }));
+    }
+  }
+
+  public sendNPCMapEdge(data: {
+    npcId: string,
+    edges: { up: boolean, down: boolean, left: boolean, right: boolean },
+    currentTile: { tileX: number, tileY: number },
+    x: number,
+    y: number,
+    facing: string
+  }): void {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'npc-map-edge',
+        ...data
       }));
     }
   }

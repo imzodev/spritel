@@ -187,7 +187,12 @@ export class NPC {
                     this.isMoving = false;
                     this.state = 'idle';
                     this.updateAnimation();
-                    this.scene.game.events.emit('npc-movement-complete', { npcId: this.config.id, x: this.sprite.x, y: this.sprite.y });
+                    // Replace game events with NetworkManager
+                    this.scene.getNetworkManager().sendNPCMovementComplete({
+                        npcId: this.config.id,
+                        x: this.sprite.x,
+                        y: this.sprite.y
+                    });
                 }
             }
         }
@@ -223,31 +228,36 @@ export class NPC {
         
     private handleEdgeOfMap(): void {
         if (!this.isMoving) return;
-    
+
         // Get tile coordinates
         const { tileX, tileY } = pixelsToTiles(this.sprite.x, this.sprite.y);
-    
+
         // Check if NPC is within the buffer zone from the edge
         const atTopEdge = tileY <= NPC_BUFFER_TILES;
         const atBottomEdge = tileY >= MAP_HEIGHT_TILES - NPC_BUFFER_TILES - 1;
         const atLeftEdge = tileX <= NPC_BUFFER_TILES;
         const atRightEdge = tileX >= MAP_WIDTH_TILES - NPC_BUFFER_TILES - 1;
-    
+
         const npcOnTheEdge = atTopEdge || atBottomEdge || atLeftEdge || atRightEdge;
-    
+
         if (npcOnTheEdge) {
             this.isMoving = false;
             this.state = 'idle';
-    
-            // Emit event with edge information
-            this.scene.game.events.emit('npc-map-edge', {
+            
+            // Stop the NPC's movement
+            const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+            body.setVelocity(0, 0);
+
+            // Notify server through NetworkManager
+            this.scene.getNetworkManager().sendNPCMapEdge({
                 npcId: this.getId(),
                 edges: { up: atTopEdge, down: atBottomEdge, left: atLeftEdge, right: atRightEdge },
                 currentTile: { tileX, tileY },
                 x: this.sprite.x,
-                y: this.sprite.y
+                y: this.sprite.y,
+                facing: this.facing
             });
-    
+
             console.log(`[NPC ${this.config.id}] Reached map edge at (${tileX}, ${tileY})`);
         }
     }

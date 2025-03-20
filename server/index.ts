@@ -415,17 +415,24 @@ function broadcast(
 console.log(`WebSocket server running on port ${server.port}`);
 
 function handleNPCMovementComplete(data: { npcId: string, x: number, y: number }): void {
-  const { npcId, x, y } = data;
-  console.log(`[Server] NPC ${npcId} movement completed. Updating position to (${x}, ${y})`);
-  const npc = npcStates.get(npcId);
-  if (!npc) return;
-  npc.x = x;
-  npc.y = y;
-  npc.currentTile = pixelsToTiles(x, y);
-  npc.movementState.isMoving = false;
-  npc.state = 'idle';
-  // Generate a new movement path
-  generateNewPath(npc);
+    const { npcId, x, y } = data;
+    console.log(`[Server] NPC ${npcId} movement completed. Updating position to (${x}, ${y})`);
+    
+    const npc = npcStates.get(npcId);
+    if (!npc) return;
+    
+    // Update NPC state
+    npc.x = x;
+    npc.y = y;
+    npc.currentTile = pixelsToTiles(x, y);
+    npc.movementState.isMoving = false;
+    npc.state = 'idle';
+    
+    // Generate a new movement path after a short delay
+    setTimeout(() => {
+        if (!npc) return;
+        generateNewPath(npc);
+    }, 1000);
 }
 
 function handleNPCCollision(data: { npcId: string, collision: { up: boolean, down: boolean, left: boolean, right: boolean }, currentTile: { x: number, y: number }, x: number, y: number}): void {
@@ -455,28 +462,35 @@ function getFacingFromVelocity(velocity: { x: number, y: number }): 'up' | 'down
   }
 }
 
-function handleNPCMapEdge(data: { npcId: string, edges: { up: boolean, down: boolean, left: boolean, right: boolean }, currentTile: { x: number, y: number }, x: number, y: number, facing: string }) {
-  const { npcId, edges, currentTile, x, y, facing } = data;
-  const npc = npcStates.get(npcId);
-  if (!npc) return;
-  npc.x = x;
-  npc.y = y;
-  npc.currentTile = pixelsToTiles(x, y);
-  // npc.facing = facing;
-  npc.movementState.isMoving = false;
-  npc.state = 'idle';
-  console.log(`[Server] NPC ${npcId} reached map edge:`, edges);
-  
-  // Immediately stop the NPC
-  npc.currentVelocity = { x: 0, y: 0 };
-
-  // Wait before choosing new direction
-  setTimeout(() => {
+function handleNPCMapEdge(data: { 
+    npcId: string, 
+    edges: { up: boolean, down: boolean, left: boolean, right: boolean }, 
+    currentTile: { tileX: number, tileY: number }, 
+    x: number, 
+    y: number, 
+    facing: string 
+}): void {
+    const { npcId, edges, x, y } = data;
+    const npc = npcStates.get(npcId);
     if (!npc) return;
+
+    // Update NPC state
+    npc.x = x;
+    npc.y = y;
+    npc.currentTile = pixelsToTiles(x, y);
+    npc.movementState.isMoving = false;
+    npc.state = 'idle';
     
-    // Generate a new path
-    generateNewPath(npc);
-  }, 2000);
+    // Immediately stop the NPC
+    npc.currentVelocity = { x: 0, y: 0 };
+
+    console.log(`[Server] NPC ${npcId} reached map edge:`, edges);
+
+    // Generate new path immediately but in opposite direction
+    setTimeout(() => {
+        if (!npc) return;
+        generateNewPath(npc);
+    }, 1000);
 }
 
 
