@@ -125,13 +125,32 @@ function initializeNPCMovement(): NPCMovementState {
   };
 }
 
-function generateNewPath(npc: NPCState): void {
-  console.log(`[Server] Attempting to generate new path for NPC ${npc.id} currently facing ${npc.facing}`);
+const THROTTLE_INTERVAL = 5000; // 5 seconds
+let lastPathUpdate = Date.now();
 
+function generateNewPath(npc: NPCState, isIntervalUpdate: boolean = false): void {
+  const now = Date.now();
+
+  // Skip if NPC is already moving
   if (npc.movementState.isMoving) {
-    console.log(`[Server] NPC ${npc.id} is already moving, skipping`);
+    console.log(`[Server] NPC ${npc.id} is already moving, skipping path generation`);
     return;
   }
+
+  // For collision updates (non-interval), check if we're within the throttle period
+  if (!isIntervalUpdate && (now - lastPathUpdate) < THROTTLE_INTERVAL) {
+    console.log(`[Server] Path already generated this interval, skipping`);
+    return;
+  }
+
+  console.log(`[Server] Generating new path for NPC ${npc.id}`);
+  
+  // Only update lastPathUpdate for collision-triggered updates
+  if (!isIntervalUpdate) {
+    lastPathUpdate = now;
+  }
+
+  console.log(`[Server] Attempting to generate new path for NPC ${npc.id} currently facing ${npc.facing}`);
 
   // Get current position
   const currentX = npc.x;
@@ -438,7 +457,7 @@ function handleNPCCollision(data: { npcId: string, collision: { up: boolean, dow
   setTimeout(() => {
     if (!npc) return;
     npc.isColliding = false;
-    generateNewPath(npc);
+    generateNewPath(npc, false);  // This is a collision update
   }, 1000);
 }
 
@@ -482,16 +501,10 @@ function handleNPCMapEdge(data: {
 }
 
 
-// Make sure movement generation happens regularly
-setTimeout(() => {
-  console.log('[Server] Checking NPCs for movement updates');
+// Global update every 5 seconds
+setInterval(() => {
+  console.log('[Server] Global NPC path update');
   npcStates.forEach((npc, id) => {
-    console.log(`[Server] NPC ${id} state:`, {
-      isMoving: npc.movementState.isMoving,
-      state: npc.state
-    });
-    if (!npc.movementState.isMoving) {
-      generateNewPath(npc);
-    }
+    generateNewPath(npc, true);  // This is an interval update
   });
-}, 5000); // Every 3 seconds
+}, THROTTLE_INTERVAL); // Every 5 seconds

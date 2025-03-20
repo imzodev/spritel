@@ -116,6 +116,10 @@ export default tseslint.config({
 - `/public` - Static assets
   - `/assets` - Game assets (maps, tilesets, etc.)
 
+## Contributing
+TODO: There will be a point where we will be receiving many NPC collision detections from players, the server will be sending X amount
+of updates, so we will need a way to handle collisions and synchronization of NPC positions more efficiently.
+
 ## License
 
 [Add your license here]
