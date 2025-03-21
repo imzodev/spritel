@@ -50,13 +50,13 @@ const DialogueBox = ({
     return (
         <div
             className={`
-                fixed bottom-0 left-0 right-0 p-4 
-                bg-gray-900/95 text-white
-                border-t-2 border-gray-700 
-                max-h-[200px] overflow-y-auto
-                z-50 pointer-events-auto
-                ${isOpen ? "block" : "hidden"}
-            `}
+        fixed bottom-0 left-0 right-0 p-4 
+        bg-gray-900/95 text-white
+        border-t-2 border-gray-700 
+        overflow-y-visible
+        z-50 pointer-events-auto
+        ${isOpen ? "block" : "hidden"}
+    `}
             ref={dialogueRef}
         >
             <div className="flex justify-between items-center mb-2">
