@@ -44,13 +44,15 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private loadAssets(): void {
-        this.load.image("tiles", "/assets/beginnertileset.png");
+        // Change 'tiles' to 'beginnertileset' to match the tileset name in the map files
+        this.load.image("beginnertileset", "/assets/beginnertileset.png");
+        this.load.image("1_terrain", "/assets/1_terrain.png");
+        this.load.image("3_plants", "/assets/3_plants.png");
         this.load.spritesheet("player", "/assets/player.png", {
             frameWidth: 64,
             frameHeight: 64,
         });
         
-        // Add specific logging for npc_1 loading
         this.load.spritesheet("npc_1", "/assets/npc_1.png", {
             frameWidth: 64,
             frameHeight: 64

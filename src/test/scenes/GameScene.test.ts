@@ -167,7 +167,9 @@ describe('GameScene', () => {
 
         it('should load required assets', () => {
             gameScene.preload()
-            expect(gameScene.load.image).toHaveBeenCalledWith('tiles', '/assets/beginnertileset.png')
+            expect(gameScene.load.image).toHaveBeenCalledWith('beginnertileset', '/assets/beginnertileset.png')
+            expect(gameScene.load.image).toHaveBeenCalledWith('1_terrain', '/assets/1_terrain.png')
+            expect(gameScene.load.image).toHaveBeenCalledWith('3_plants', '/assets/3_plants.png')
             expect(gameScene.load.spritesheet).toHaveBeenCalledWith('player', '/assets/player.png', {
                 frameWidth: 64,
                 frameHeight: 64

@@ -25,6 +25,7 @@ export class MapManager {
         "map_1_-1", // South-East
         "map_-1_1", // North-West
         "map_1_1", // North-East
+        "map_0_2",
     ]);
 
     constructor(
@@ -178,26 +179,47 @@ export class MapManager {
     }
 
     private async createMap(): Promise<void> {
-        const mapKey = this.getMapKey(
-            this.currentPosition.x,
-            this.currentPosition.y
-        );
+        const mapKey = this.getMapKey(this.currentPosition.x, this.currentPosition.y);
         console.log("Creating new map:", mapKey);
 
         const map = this.scene.make.tilemap({ key: mapKey });
-        const tileset = map.addTilesetImage("beginnertileset", "tiles");
+        const tilesets: Phaser.Tilemaps.Tileset[] = [];
 
-        if (!tileset) {
-            console.error("Failed to add tileset");
+        // Get the tileset data from the map
+        const mapData = this.scene.cache.json.get(mapKey);
+        if (!mapData || !mapData.tilesets) {
+            console.error("No tileset data found in map");
             return;
         }
 
-        console.log("Creating map layers...");
+        // Sort tilesets by firstgid to ensure correct ordering
+        const sortedTilesets = [...mapData.tilesets].sort((a, b) => a.firstgid - b.firstgid);
+
+        // Add each tileset in order
+        for (const tilesetData of sortedTilesets) {
+            const tilesetName = tilesetData.name;
+            console.log(`Adding tileset: ${tilesetName} with firstgid: ${tilesetData.firstgid}`);
+            
+            const addedTileset = map.addTilesetImage(tilesetName, tilesetName);
+            if (addedTileset) {
+                tilesets.push(addedTileset);
+                console.log(`Successfully added tileset: ${tilesetName}`);
+            } else {
+                console.error(`Failed to add tileset: ${tilesetName}`);
+            }
+        }
+
+        if (tilesets.length === 0) {
+            console.error("No tilesets were successfully added");
+            return;
+        }
+
+        console.log("Creating map layers with tilesets:", tilesets);
         this.currentLayers = {
-            ground: map.createLayer("Ground", tileset, 0, 0),
-            decorationLower: map.createLayer("DecorationLower", tileset, 0, 0),
-            decorationUpper: map.createLayer("DecorationUpper", tileset, 0, 0),
-            collision: map.createLayer("Collision", tileset, 0, 0),
+            ground: map.createLayer("Ground", tilesets, 0, 0),
+            decorationLower: map.createLayer("DecorationLower", tilesets, 0, 0),
+            decorationUpper: map.createLayer("DecorationUpper", tilesets, 0, 0),
+            collision: map.createLayer("Collision", tilesets, 0, 0),
         };
 
         // Set proper depth for layers
