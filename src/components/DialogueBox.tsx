@@ -81,7 +81,7 @@ const DialogueBox = ({
                 {options.map((option, index) => (
                     <button
                         key={index}
-                        onClick={() => onOptionSelect(option)}
+                        onClick={() => onOptionSelect?.(option)}
                         className="text-left hover:bg-gray-700 p-2 rounded transition-colors"
                     >
                         {option}
