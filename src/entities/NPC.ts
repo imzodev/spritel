@@ -365,9 +365,11 @@ export class NPC {
     public endInteraction(): void {
         if (this.isInteracting) {
             console.log('[NPC] Ending interaction with:', this.config.name);
-            this.scene.getNetworkManager().sendInteractionEnd(this.config.id );
+            this.scene.getNetworkManager().sendInteractionEnd(this.config.id);
             this.isInteracting = false;
             this.setState('idle');
+            // Emit an event when interaction ends
+            this.scene.events.emit('npcInteractionEnd');
         }
     }
 

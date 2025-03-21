@@ -45,12 +45,9 @@ const Game = () => {
                 const scene = game.scene.getScene("GameScene") as GameScene;
                 if (scene) {
                     setGameScene(scene);
-                    
-                    // Subscribe to NPC interaction events
-                    scene.events.on("npcInteraction", handleNPCInteraction);
                     return true;
                 }
-            } catch (e) {
+            } catch (event) {
                 console.log("Scene not ready yet");
             }
             return false;
@@ -66,28 +63,23 @@ const Game = () => {
 
         return () => {
             game.destroy(true);
-            if (gameScene) {
-                gameScene.events.off("npcInteraction", handleNPCInteraction);
-            }
+            setGameScene(null); // Ensure gameScene is reset
         };
     }, []);
 
-    // useEffect(() => {
-    //     if (gameScene) {
-    //         // Add the event listener
-    //         const handleNPCInteractionEvent = (data: any) => {
-    //             console.log('[Game] NPC interaction event received:', data);
-    //             handleNPCInteraction(data);
-    //         };
+    useEffect(() => {
+        if (!gameScene) return;
 
-    //         gameScene.events.on("npcInteraction", handleNPCInteractionEvent);
+        // Subscribe to NPC interaction and end events
+        gameScene.events.on("npcInteraction", handleNPCInteraction);
+        gameScene.events.on("npcInteractionEnd", handleCloseDialogue);
 
-    //         return () => {
-    //             // Clean up the listener
-    //             gameScene.events.off("npcInteraction", handleNPCInteractionEvent);
-    //         };
-    //     }
-    // }, [gameScene]);
+        return () => {
+            // Cleanup NPC interaction and end event listeners
+            gameScene.events.off("npcInteractionEnd", handleCloseDialogue);
+            gameScene.events.off("npcInteraction", handleNPCInteraction);
+        };
+    }, [gameScene]);
 
     const handleNPCInteraction = async (data: {
         npcId: string;
@@ -95,12 +87,9 @@ const Game = () => {
         personalityType: string;
         context?: any;
     }) => {
-        console.log('[Game] Received NPC interaction event:', data);
-        
+        console.log("[Game] Received NPC interaction event:", data);
         // Pause the game scene
-        if (gameScene) {
-            gameScene.scene.pause();
-        }
+        gameScene?.scene.pause();
 
         // Get initial NPC response
         try {
@@ -122,7 +111,7 @@ const Game = () => {
                 return newState;
             });
         } catch (error) {
-            console.error('[Game] Failed to show dialogue:', error);
+            console.error("[Game] Failed to show dialogue:", error);
         }
     };
 
@@ -132,18 +121,15 @@ const Game = () => {
             return;
         }
 
-        // Simple response without AI service for now
-        setDialogueState(prev => ({
+        setDialogueState((prev) => ({
             ...prev,
             message: `You selected: ${option}`,
         }));
     };
 
     const handleCloseDialogue = () => {
-        if (gameScene) {
-            // Just resume the scene
-            gameScene.scene.resume();
-        }
+        // Just resume the scene
+        gameScene?.scene.resume();
         
         setDialogueState(prev => ({
             ...prev,
