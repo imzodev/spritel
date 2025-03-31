@@ -175,6 +175,10 @@ function generateNewPath(npc: NPCState, isIntervalUpdate: boolean = false): void
     case 'right': targetX += distance; break;
   }
 
+  // Clamp target coordinates so that NPC remains fully within map boundaries (map 0,0)
+  targetX = Math.min(Math.max(targetX, 0), MAP_WIDTH - TILE_SIZE);
+  targetY = Math.min(Math.max(targetY, 0), MAP_HEIGHT - TILE_SIZE);
+
   broadcast({
     type: 'npc-movement-instruction',
     npcId: npc.id,

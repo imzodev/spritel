@@ -177,26 +177,10 @@ export class NPC {
             this.handleEdgeOfMap();
     
 
-            // Check if we've reached the target position
-            // Is causing errors, we will instead ask for a new path every 5 seconds instead
-            // const hasReachedTarget = this.hasReachedTarget();
-            // if (hasReachedTarget) {
-            //     this.isMoving = false;
-            //     this.state = 'idle';
-            //     this.updateAnimation();
-                
-            //     // Notify server that movement is complete
-            //     this.scene.getNetworkManager().sendNPCMovementComplete({
-            //         npcId: this.config.id,
-            //         x: this.sprite.x,
-            //         y: this.sprite.y
-            //     });
-            // }
+            // Add at the end of existing update method
+            this.drawDebugTiles();
         }
         this.updateAnimation();
-
-        // Add at the end of existing update method
-        this.drawDebugTiles();
     }
 
     private handleCollisions(): void {

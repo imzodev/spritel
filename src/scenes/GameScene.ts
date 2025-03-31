@@ -434,21 +434,6 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
-        this.networkManager.on('npc-states', (message: any) => {
-            console.log('[GameScene] Received NPC states:', message);
-            // Assuming message.npcs is an array of NPC configurations
-            if (message && message.npcs && Array.isArray(message.npcs)) {
-                message.npcs.forEach((npcConfig: any) => {
-                    if (!this.npcManager.getNPC(npcConfig.id)) {
-                        this.npcManager.createNPC(npcConfig);
-                        console.log(`[GameScene] Created NPC: ${npcConfig.id}`);
-                    } else {
-                        this.npcManager.updateNPC(npcConfig);
-                        console.log(`[GameScene] Updated NPC: ${npcConfig.id}`);
-                    }
-                });
-            }
-        });
     }
 
     public getPlayer(): Player {
@@ -758,10 +743,9 @@ export default class GameScene extends Phaser.Scene {
         // Check for NPC interactions only when player moves or presses interact key
         if (movement.x !== 0 || movement.y !== 0 || Phaser.Input.Keyboard.JustDown(this.interactKey)) {
             if (this.npcManager) {
-                const npcsInRange = this.npcManager.getNPCsInRange();
                 // Only handle interaction if the interact key was pressed
-                if (this.interactKey?.isDown && npcsInRange.length > 0) {
-                    const npc = npcsInRange[0];
+                if (this.interactKey?.isDown) {
+                    const npc = this.npcManager.getNPC('merchant');
                     npc.setState('talking');
                     console.log('Interacting with NPC:', npc);
                     // Add this line to properly trigger the interaction
