@@ -62,8 +62,8 @@ export class NPC {
     private isInteracting: boolean = false;
 
     // Add these as private static constants at the top of the class
-    private static readonly COLLISION_BOX_WIDTH = 28;  // Width of collision box
-    private static readonly COLLISION_BOX_HEIGHT = 28; // Height of collision box
+    private static readonly COLLISION_BOX_WIDTH = 14;  // Width of collision box
+    private static readonly COLLISION_BOX_HEIGHT = 14; // Height of collision box
 
     constructor(scene: GameScene, config: NPCConfig) {
         this.scene = scene;
@@ -91,12 +91,17 @@ export class NPC {
         // Configure physics body
         const body = this.sprite.body as Phaser.Physics.Arcade.Body;
         body.setCollideWorldBounds(true);
+        console.log(this.sprite.width, this.sprite.height);
+        
         
         // Calculate offsets to center the collision box
-        const offsetX = (this.sprite.width - NPC.COLLISION_BOX_WIDTH) / 2;
-        const offsetY = (this.sprite.height - NPC.COLLISION_BOX_HEIGHT);
+        // TODO: Adjust offsets based on sprite size, but correct sprite size first
+        // const offsetX = (this.sprite.width - NPC.COLLISION_BOX_WIDTH);
+        // const offsetY = (this.sprite.height - NPC.COLLISION_BOX_HEIGHT * 2);
+        const offsetX = (32 - NPC.COLLISION_BOX_WIDTH);
+        const offsetY = (42 - NPC.COLLISION_BOX_HEIGHT / 2);
         
-        body.setSize(NPC.COLLISION_BOX_WIDTH, NPC.COLLISION_BOX_HEIGHT);
+        body.setSize(NPC.COLLISION_BOX_WIDTH*2, NPC.COLLISION_BOX_HEIGHT*2);
         body.setOffset(offsetX, offsetY);
         
         body.setImmovable(true);
