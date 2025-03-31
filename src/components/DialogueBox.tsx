@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface DialogueBoxProps {
     npcName: string;
@@ -19,6 +19,7 @@ const DialogueBox = ({
 }: DialogueBoxProps) => {
     const [isTyping, setIsTyping] = useState(false);
     const [displayedText, setDisplayedText] = useState("");
+    const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
     const dialogueRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -43,7 +44,53 @@ const DialogueBox = ({
             };
         }
     }, [message, isOpen]);
+
+    // Reset selected option when dialogue opens or options change
+    useEffect(() => {
+        setSelectedOptionIndex(0);
+    }, [isOpen, options]);
+
+    // Handle keyboard navigation
+    const handleKeyDown = useCallback((e: KeyboardEvent) => {
+        if (!isOpen) return;
+
+        switch (e.key) {
+            case 'Escape':
+                e.preventDefault();
+                onClose();
+                break;
+            case 'ArrowUp':
+                if (isTyping || options.length === 0) return;
+                e.preventDefault();
+                setSelectedOptionIndex(prev => 
+                    prev > 0 ? prev - 1 : options.length - 1
+                );
+                break;
+            case 'ArrowDown':
+                if (isTyping || options.length === 0) return;
+                e.preventDefault();
+                setSelectedOptionIndex(prev => 
+                    prev < options.length - 1 ? prev + 1 : 0
+                );
+                break;
+            case 'Enter':
+                if (isTyping || options.length === 0) return;
+                e.preventDefault();
+                if (selectedOptionIndex >= 0 && selectedOptionIndex < options.length) {
+                    onOptionSelect?.(options[selectedOptionIndex]);
+                }
+                break;
+        }
+    }, [isOpen, isTyping, options, onOptionSelect, selectedOptionIndex, onClose]);
     
+
+    // Add event listener for keyboard navigation
+    useEffect(() => {
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [handleKeyDown]);
 
     if (!isOpen) return null;
 
@@ -82,7 +129,7 @@ const DialogueBox = ({
                     <button
                         key={index}
                         onClick={() => onOptionSelect?.(option)}
-                        className="text-left hover:bg-gray-700 p-2 rounded transition-colors"
+                        className={`text-left p-2 rounded transition-colors ${index === selectedOptionIndex ? 'bg-gray-700 border-l-4 border-yellow-400' : 'hover:bg-gray-700'}`}
                     >
                         {option}
                     </button>
