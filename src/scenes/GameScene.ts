@@ -759,13 +759,16 @@ export default class GameScene extends Phaser.Scene {
         // Check for NPC interactions only when player moves or presses interact key
         if (movement.x !== 0 || movement.y !== 0 || Phaser.Input.Keyboard.JustDown(this.interactKey)) {
             if (this.npcManager) {
+                const npcsInRange = this.npcManager.getNPCsInRange();
                 // Only handle interaction if the interact key was pressed
-                if (this.interactKey?.isDown) {
-                    const npc = this.npcManager.getNPC('merchant');
-                    npc.setState('talking');
-                    console.log('Interacting with NPC:', npc);
-                    // Add this line to properly trigger the interaction
-                    this.handleNPCInteraction(npc);
+                if (this.interactKey?.isDown && npcsInRange.length > 0) {
+                    const npc = npcsInRange[0];
+                    if (npc) {
+                        npc.setState('talking');
+                        console.log('Interacting with NPC:', npc);
+                        // Add this line to properly trigger the interaction
+                        this.handleNPCInteraction(npc);
+                    }
                 }
             }
         }
