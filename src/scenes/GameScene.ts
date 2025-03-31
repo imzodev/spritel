@@ -48,6 +48,21 @@ export default class GameScene extends Phaser.Scene {
         this.load.image("beginnertileset", "/assets/beginnertileset.png");
         this.load.image("1_terrain", "/assets/1_terrain.png");
         this.load.image("3_plants", "/assets/3_plants.png");
+        this.load.image("4_buildings", "/assets/4_buildings.png");
+        this.load.image("4_buildings_x05", "/assets/4_buildings_x05.png");
+        this.load.image("11_roofs", "/assets/11_roofs.png");
+        this.load.image("spr_tileset_sunnysideworld_16px", "/assets/spr_tileset_sunnysideworld_16px.png");
+        this.load.image("House", "/assets/House.png");
+        this.load.image("Floors", "/assets/Floors.png");
+        this.load.image("Floors_Tiles", "/assets/Floors_Tiles.png");
+        this.load.image("Props", "/assets/Props.png");
+        this.load.image("Roofs", "/assets/Roofs.png");
+        this.load.image("Shadows", "/assets/Shadows.png");
+        this.load.image("Rocks", "/assets/Rocks.png");
+        this.load.image("Trees_Size_03", "/assets/Trees_Size_03.png");
+        this.load.image("Walls", "/assets/Walls.png");
+        this.load.image("Furniture", "/assets/Furniture.png")
+
         this.load.spritesheet("player", "/assets/player.png", {
             frameWidth: 64,
             frameHeight: 64,

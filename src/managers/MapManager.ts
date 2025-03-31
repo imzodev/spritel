@@ -26,6 +26,8 @@ export class MapManager {
         "map_-1_1", // North-West
         "map_1_1", // North-East
         "map_0_2",
+        "map_-1_2",
+        "map_1_2",
     ]);
 
     constructor(
@@ -216,21 +218,53 @@ export class MapManager {
 
         console.log("Creating map layers with tilesets:", tilesets);
         this.currentLayers = {
-            ground: map.createLayer("Ground", tilesets, 0, 0),
-            decorationLower: map.createLayer("DecorationLower", tilesets, 0, 0),
-            decorationUpper: map.createLayer("DecorationUpper", tilesets, 0, 0),
             collision: map.createLayer("Collision", tilesets, 0, 0),
+            ground: map.createLayer("Ground", tilesets, 0, 0),
+            groundUpper: map.createLayer("GroundUpper", tilesets, 0, 0),
+            decorationUpper2: map.createLayer("DecorationUpper2", tilesets, 0, 0),
+            decorationUpper1: map.createLayer("DecorationUpper1", tilesets, 0, 0),
+            decorationUpper: map.createLayer("DecorationUpper", tilesets, 0, 0),
+            decorationUpperShadow: map.createLayer("DecorationUpperShadow", tilesets, 0, 0),
+            decorationMiddle2: map.createLayer("DecorationMiddle2", tilesets, 0, 0),
+            decorationMiddle1: map.createLayer("DecorationMiddle1", tilesets, 0, 0),
+            decorationMiddle: map.createLayer("DecorationMiddle", tilesets, 0, 0),
+            decorationLowerShadow: map.createLayer("DecorationLowerShadow", tilesets, 0, 0),
+            decorationLower: map.createLayer("DecorationLower", tilesets, 0, 0),
         };
 
         // Set proper depth for layers
         if (this.currentLayers.ground) {
             this.currentLayers.ground.setDepth(0);
         }
+        if (this.currentLayers.groundUpper) {
+            this.currentLayers.groundUpper.setDepth(1);
+        }
+        if (this.currentLayers.decorationLowerShadow) {
+            this.currentLayers.decorationLowerShadow.setDepth(9);
+        }
         if (this.currentLayers.decorationLower) {
             this.currentLayers.decorationLower.setDepth(10);
         }
+        if (this.currentLayers.decorationMiddle) {
+            this.currentLayers.decorationMiddle.setDepth(20);
+        }
+        if (this.currentLayers.decorationMiddle1) {
+            this.currentLayers.decorationMiddle1.setDepth(21);
+        }
+        if (this.currentLayers.decorationMiddle2) {
+            this.currentLayers.decorationMiddle2.setDepth(22);
+        }
+        if (this.currentLayers.decorationUpperShadow) {
+            this.currentLayers.decorationUpperShadow.setDepth(29);
+        }
         if (this.currentLayers.decorationUpper) {
             this.currentLayers.decorationUpper.setDepth(30);
+        }
+        if (this.currentLayers.decorationUpper1) {
+            this.currentLayers.decorationUpper1.setDepth(31);
+        }
+        if (this.currentLayers.decorationUpper2) {
+            this.currentLayers.decorationUpper2.setDepth(32);
         }
         if (this.currentLayers.collision) {
             this.currentLayers.collision.setDepth(5); // Keep collision layer below everything

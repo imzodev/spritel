@@ -170,6 +170,8 @@ describe('GameScene', () => {
             expect(gameScene.load.image).toHaveBeenCalledWith('beginnertileset', '/assets/beginnertileset.png')
             expect(gameScene.load.image).toHaveBeenCalledWith('1_terrain', '/assets/1_terrain.png')
             expect(gameScene.load.image).toHaveBeenCalledWith('3_plants', '/assets/3_plants.png')
+            expect(gameScene.load.image).toHaveBeenCalledWith('4_buildings', '/assets/4_buildings.png')
+            expect(gameScene.load.image).toHaveBeenCalledWith('11_roofs', '/assets/11_roofs.png')
             expect(gameScene.load.spritesheet).toHaveBeenCalledWith('player', '/assets/player.png', {
                 frameWidth: 64,
                 frameHeight: 64

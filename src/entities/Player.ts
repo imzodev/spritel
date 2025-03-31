@@ -54,7 +54,7 @@ export class Player {
         }
 
         // Set player depth between lower and upper decoration layers
-        sprite.setDepth(20);
+        sprite.setDepth(29);
         return sprite;
     }
 
