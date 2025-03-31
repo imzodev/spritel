@@ -434,6 +434,22 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
+        this.networkManager.on('npc-states', (message: any) => {
+            console.log('[GameScene] Received NPC states:', message);
+            // Assuming message.npcs is an array of NPC configurations
+            if (message && message.npcs && Array.isArray(message.npcs)) {
+                message.npcs.forEach((npcConfig: any) => {
+                    if (!this.npcManager.getNPC(npcConfig.id)) {
+                        this.npcManager.createNPC(npcConfig);
+                        console.log(`[GameScene] Created NPC: ${npcConfig.id}`);
+                    } else {
+                        this.npcManager.updateNPC(npcConfig);
+                        console.log(`[GameScene] Updated NPC: ${npcConfig.id}`);
+                    }
+                });
+            }
+        });
+
     }
 
     public getPlayer(): Player {
