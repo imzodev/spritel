@@ -220,17 +220,24 @@ export class NPC {
         const bodyWidth = NPC.COLLISION_BOX_WIDTH;
         const bodyHeight = NPC.COLLISION_BOX_HEIGHT;
         
-        // Calculate the actual edges of the NPC's collision box
-        const collisionLeft = this.sprite.x - (bodyWidth / 2);
-        const collisionRight = this.sprite.x + (bodyWidth / 2);
-        const collisionTop = this.sprite.y - bodyHeight; // Adjust based on offset
-        const collisionBottom = this.sprite.y; // The bottom of the collision box is at sprite.y
+        // Get the actual collision box position
+        // The body.x and body.y are the actual collision box coordinates
+        const collisionLeft = body.x;
+        const collisionRight = body.x + bodyWidth;
+        const collisionTop = body.y;
+        const collisionBottom = body.y + bodyHeight;
     
+        // Calculate the safe boundaries (where the NPC should stop)
+        const safeLeft = mapLeft + buffer;
+        const safeRight = mapRight - buffer;
+        const safeTop = mapTop + buffer;
+        const safeBottom = mapBottom - buffer;
+        
         // Check if NPC is at or beyond the map edges (including buffer)
-        const atLeftEdge = collisionLeft <= mapLeft + buffer;
-        const atRightEdge = collisionRight >= mapRight - buffer;
-        const atTopEdge = collisionTop <= mapTop + buffer;
-        const atBottomEdge = collisionBottom >= mapBottom - buffer;
+        const atLeftEdge = collisionLeft <= safeLeft;
+        const atRightEdge = collisionRight >= safeRight;
+        const atTopEdge = collisionTop <= safeTop;
+        const atBottomEdge = collisionBottom >= safeBottom;
     
         // If NPC is at any edge
         if (atLeftEdge || atRightEdge || atTopEdge || atBottomEdge) {
@@ -248,28 +255,25 @@ export class NPC {
                 atBottomEdge,
                 mapWidth: MAP_WIDTH,
                 mapHeight: MAP_HEIGHT,
-                buffer
+                buffer,
+                safeLeft,
+                safeRight,
+                safeTop,
+                safeBottom
             });
             
+            // Stop the NPC's movement when it reaches an edge
             this.isMoving = false;
             this.state = 'idle';
             body.setVelocity(0, 0); // Stop all movement
-    
-            // Clamp position to keep NPC within bounds (including buffer)
-            if (atLeftEdge) this.sprite.x = mapLeft + buffer + (bodyWidth / 2);
-            if (atRightEdge) this.sprite.x = mapRight - buffer - (bodyWidth / 2);
-            if (atTopEdge) this.sprite.y = mapTop + buffer + bodyHeight;
-            if (atBottomEdge) this.sprite.y = mapBottom - buffer;
-    
-            // Update interaction zone position after clamping
-            if (this.interactionZone) {
-                this.interactionZone.setPosition(this.sprite.x, this.sprite.y);
-            }
-    
+            
+            // Prepare edge information for the server
+            const currentEdges = { up: atTopEdge, down: atBottomEdge, left: atLeftEdge, right: atRightEdge };
+            
             // Notify server of edge event
             this.scene.getNetworkManager().sendNPCMapEdge({
                 npcId: this.getId(),
-                edges: { up: atTopEdge, down: atBottomEdge, left: atLeftEdge, right: atRightEdge },
+                edges: currentEdges,
                 currentTile: pixelsToTiles(this.sprite.x, this.sprite.y),
                 x: this.sprite.x,
                 y: this.sprite.y,
@@ -282,6 +286,85 @@ export class NPC {
 
     public getId(): string {
         return this.config.id;
+    }
+    
+    // This function pushes the NPC away from any map edge it's touching
+    private pushAwayFromEdge(): void {
+        const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+        const buffer = TILE_SIZE * NPC_BUFFER_TILES;
+        
+        // Map boundaries in pixels
+        const mapLeft = 0;
+        const mapRight = MAP_WIDTH;
+        const mapTop = 0;
+        const mapBottom = MAP_HEIGHT;
+        
+        // Get the sprite's physics body position and size
+        const bodyWidth = NPC.COLLISION_BOX_WIDTH;
+        const bodyHeight = NPC.COLLISION_BOX_HEIGHT;
+        
+        // Get the actual collision box position
+        // The body.x and body.y are the actual collision box coordinates
+        const collisionLeft = body.x;
+        const collisionRight = body.x + bodyWidth;
+        const collisionTop = body.y;
+        const collisionBottom = body.y + bodyHeight;
+        
+        // Calculate the safe boundaries
+        const safeLeft = mapLeft + buffer;
+        const safeRight = mapRight - buffer;
+        const safeTop = mapTop + buffer;
+        const safeBottom = mapBottom - buffer;
+        
+        // Check if NPC is at or beyond the map edges (including buffer)
+        const atLeftEdge = collisionLeft <= safeLeft;
+        const atRightEdge = collisionRight >= safeRight;
+        const atTopEdge = collisionTop <= safeTop;
+        const atBottomEdge = collisionBottom >= safeBottom;
+        
+        // Push the NPC away from any edge it's touching
+        let positionAdjusted = false;
+        
+        if (atLeftEdge) {
+            // Calculate offset between sprite center and collision box
+            const offsetX = this.sprite.x - body.x;
+            // Push right just 1 pixel from the edge
+            this.sprite.x = offsetX + safeLeft + 1;
+            positionAdjusted = true;
+            console.log(`[NPC ${this.config.id}] Pushed away from left edge to: (${this.sprite.x}, ${this.sprite.y})`);
+        }
+        
+        if (atRightEdge) {
+            // Calculate offset between sprite center and collision box right edge
+            const offsetX = this.sprite.x - (body.x + bodyWidth);
+            // Push left just 1 pixel from the edge
+            this.sprite.x = offsetX + safeRight - 1;
+            positionAdjusted = true;
+            console.log(`[NPC ${this.config.id}] Pushed away from right edge to: (${this.sprite.x}, ${this.sprite.y})`);
+        }
+        
+        if (atTopEdge) {
+            // Calculate offset between sprite center and collision box
+            const offsetY = this.sprite.y - body.y;
+            // Push down just 1 pixel from the edge
+            this.sprite.y = offsetY + safeTop + 1;
+            positionAdjusted = true;
+            console.log(`[NPC ${this.config.id}] Pushed away from top edge to: (${this.sprite.x}, ${this.sprite.y})`);
+        }
+        
+        if (atBottomEdge) {
+            // Calculate offset between sprite center and collision box bottom edge
+            const offsetY = this.sprite.y - (body.y + bodyHeight);
+            // Push up just 1 pixel from the edge
+            this.sprite.y = offsetY + safeBottom - 1;
+            positionAdjusted = true;
+            console.log(`[NPC ${this.config.id}] Pushed away from bottom edge to: (${this.sprite.x}, ${this.sprite.y})`);
+        }
+        
+        // If we adjusted the position, update the physics body
+        if (positionAdjusted) {
+            body.reset(this.sprite.x, this.sprite.y);
+        }
     }
 
     public updateFromNetwork(data: any): void {
@@ -472,6 +555,9 @@ export class NPC {
         facing: string,
         state: string
     }): void {
+        // Check if we need to push the NPC away from the edge before applying new movement
+        this.pushAwayFromEdge();
+        
         this.isMoving = true;
         this.facing = data.facing;
         this.currentDirection = data.facing;
