@@ -9,8 +9,8 @@ const NPC_BUFFER_TILES = 1; // Keep NPCs 1 tiles away from edges
 const PIXELS_PER_SECOND = 16;
 
 // Convert to pixels when needed
-const MAP_WIDTH = MAP_WIDTH_TILES * TILE_SIZE;
-const MAP_HEIGHT = MAP_HEIGHT_TILES * TILE_SIZE;
+const MAP_WIDTH = MAP_WIDTH_TILES * TILE_SIZE; // 24 * 16 = 384 pixels
+const MAP_HEIGHT = MAP_HEIGHT_TILES * TILE_SIZE; // 15 * 16 = 240 pixels
 
 // Add these interfaces and constants
 interface TilePosition {
@@ -207,31 +207,30 @@ export class NPC {
 
     
     private handleEdgeOfMap(): void {
-        /*
-        * Improved edge detection logic but there are still issues determining the correct position of the NPC and determining the coordinates of the edges
-        */
         const body = this.sprite.body as Phaser.Physics.Arcade.Body;
         const buffer = TILE_SIZE * NPC_BUFFER_TILES; // Buffer zone in pixels (16px)
     
-        // Map boundaries in pixels
+        // Map boundaries in pixels - use the global constants
         const mapLeft = 0;
-        const mapRight = MAP_WIDTH;   // 24 * 16 = 384
+        const mapRight = MAP_WIDTH;   // 24 * 16 = 384 pixels
         const mapTop = 0;
-        const mapBottom = MAP_HEIGHT; // 15 * 16 = 240
+        const mapBottom = MAP_HEIGHT; // 15 * 16 = 240 pixels
     
-        // Calculate collision box boundaries centered on the sprite
-        const collisionLeft = this.sprite.x - (NPC.COLLISION_BOX_WIDTH / 2);
-        const collisionRight = this.sprite.x + (NPC.COLLISION_BOX_WIDTH / 2);
-        const collisionTop = this.sprite.y - NPC.COLLISION_BOX_HEIGHT;
-        const collisionBottom = this.sprite.y - NPC.COLLISION_BOX_HEIGHT;
+        // Get the sprite's physics body position and size
+        const bodyWidth = NPC.COLLISION_BOX_WIDTH;
+        const bodyHeight = NPC.COLLISION_BOX_HEIGHT;
+        
+        // Calculate the actual edges of the NPC's collision box
+        const collisionLeft = this.sprite.x - (bodyWidth / 2);
+        const collisionRight = this.sprite.x + (bodyWidth / 2);
+        const collisionTop = this.sprite.y - bodyHeight; // Adjust based on offset
+        const collisionBottom = this.sprite.y; // The bottom of the collision box is at sprite.y
     
         // Check if NPC is at or beyond the map edges (including buffer)
         const atLeftEdge = collisionLeft <= mapLeft + buffer;
         const atRightEdge = collisionRight >= mapRight - buffer;
         const atTopEdge = collisionTop <= mapTop + buffer;
         const atBottomEdge = collisionBottom >= mapBottom - buffer;
-    
-        
     
         // If NPC is at any edge
         if (atLeftEdge || atRightEdge || atTopEdge || atBottomEdge) {
@@ -251,14 +250,15 @@ export class NPC {
                 mapHeight: MAP_HEIGHT,
                 buffer
             });
+            
             this.isMoving = false;
             this.state = 'idle';
             body.setVelocity(0, 0); // Stop all movement
     
             // Clamp position to keep NPC within bounds (including buffer)
-            if (atLeftEdge) this.sprite.x = mapLeft + buffer + (NPC.COLLISION_BOX_WIDTH / 2);
-            if (atRightEdge) this.sprite.x = mapRight - buffer - (NPC.COLLISION_BOX_WIDTH / 2);
-            if (atTopEdge) this.sprite.y = mapTop + buffer + NPC.COLLISION_BOX_HEIGHT;
+            if (atLeftEdge) this.sprite.x = mapLeft + buffer + (bodyWidth / 2);
+            if (atRightEdge) this.sprite.x = mapRight - buffer - (bodyWidth / 2);
+            if (atTopEdge) this.sprite.y = mapTop + buffer + bodyHeight;
             if (atBottomEdge) this.sprite.y = mapBottom - buffer;
     
             // Update interaction zone position after clamping
