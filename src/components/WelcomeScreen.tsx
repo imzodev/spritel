@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface WelcomeScreenProps {
   onStart: () => void;
@@ -10,10 +10,28 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   const [playerName, setPlayerName] = useState('');
   const [nameError, setNameError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Reference to the name input field for auto-focus
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Animated background effect
   const [bgPosition, setBgPosition] = useState({ x: 0, y: 0 });
   
+  // Auto-focus on the name input field when component mounts
+  useEffect(() => {
+    if (nameInputRef.current) {
+      nameInputRef.current.focus();
+    }
+  }, []);
+
+  // Handle form submission with Enter key
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !isLoading) {
+      e.preventDefault();
+      handleStartGame();
+    }
+  };
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       const x = (e.clientX / window.innerWidth) * 10;
@@ -22,7 +40,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
     };
     
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
   }, []);
 
   const handleStartGame = () => {
@@ -100,10 +121,13 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                 <input
                   type="text"
                   id="playerName"
+                  ref={nameInputRef}
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   className={`w-full px-3 py-2 bg-gray-800 rounded border ${nameError ? 'border-red-500' : 'border-gray-600'} text-white focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                   placeholder="Enter your character name"
+                  autoFocus
                 />
                 {nameError && <p className="mt-1 text-sm text-red-500">{nameError}</p>}
               </div>
@@ -157,7 +181,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
             <button
               onClick={handleStartGame}
               disabled={isLoading}
-              className={`px-8 py-3 rounded-full font-bold text-lg transition-all transform hover:scale-105 ${
+              className={`px-8 py-3 rounded-full font-bold text-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
                 isLoading
                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg hover:shadow-indigo-500/50'
