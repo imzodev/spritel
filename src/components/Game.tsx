@@ -12,6 +12,7 @@ const Game = () => {
     const [dialogueState, setDialogueState] = useState({
         isOpen: false,
         npcName: "",
+        personalityType: "", // Add personality type for AI responses
         message: "",
         options: [] as string[],
     });
@@ -82,6 +83,31 @@ const Game = () => {
         };
     }, [gameScene]);
 
+    // Create a reusable function to get game context
+    const getGameContext = () => {
+        return {
+            timeOfDay: 'day', // Could be dynamic based on game time
+            weather: 'clear', // Could be dynamic based on game weather
+            playerLevel: 1, // Could be dynamic based on player stats
+            location: 'village', // Could be dynamic based on map
+            activeQuests: ['tutorial'] // Could be dynamic based on quest log
+        };
+    };
+
+    // Create a reusable function to get AI response
+    const getAIResponse = async (npcType: string, message: string) => {
+        try {
+            return await aiService.current.generateResponse(
+                npcType,
+                message,
+                getGameContext()
+            );
+        } catch (error) {
+            console.error("[Game] Failed to get AI response:", error);
+            return null; // Return null to indicate failure
+        }
+    };
+
     const handleNPCInteraction = async (data: {
         npcId: string;
         npcName: string;
@@ -96,15 +122,6 @@ const Game = () => {
         try {
             console.log('[Game] Setting dialogue state to open');
             
-            // Create game context for the NPC
-            const gameContext = {
-                timeOfDay: 'day', // Could be dynamic based on game time
-                weather: 'clear', // Could be dynamic based on game weather
-                playerLevel: 1, // Could be dynamic based on player stats
-                location: 'village', // Could be dynamic based on map
-                activeQuests: ['tutorial'] // Could be dynamic based on quest log
-            };
-            
             // Default message and options
             let initialMessage = "Hello traveler! How may I help you today?";
             let options = [
@@ -114,16 +131,14 @@ const Game = () => {
                 "Goodbye",
             ];
             
-            try {
-                // Get AI-generated greeting from the NPC using our AI service
-                initialMessage = await aiService.current.generateResponse(
-                    data.personalityType || 'merchant',
-                    "Hello, I'm a new traveler here.",
-                    gameContext
-                );
-            } catch (error) {
-                console.error("[Game] Failed to get AI response:", error);
-                // Fall back to default greeting
+            // Get AI-generated greeting
+            const aiResponse = await getAIResponse(
+                data.personalityType || 'merchant',
+                "Hello, I'm a new traveler here."
+            );
+            
+            if (aiResponse) {
+                initialMessage = aiResponse;
             }
             
             setDialogueState(prev => {
@@ -131,6 +146,7 @@ const Game = () => {
                 const newState = {
                     isOpen: true,
                     npcName: data.npcName,
+                    personalityType: data.personalityType || 'merchant', // Store personality type for later use
                     message: initialMessage,
                     options: options,
                 };
@@ -155,25 +171,14 @@ const Game = () => {
             options: [], // Remove options while loading
         }));
 
-        // Create game context for the NPC
-        const gameContext = {
-            timeOfDay: 'day',
-            weather: 'clear',
-            playerLevel: 1,
-            location: 'village',
-            activeQuests: ['tutorial']
-        };
-
         try {
-            const response = await aiService.current.generateResponse(
-                dialogueState.npcName.toLowerCase(),
-                option,
-                gameContext
-            );
+            // Use the stored personality type from dialogue state
+            const npcType = dialogueState.personalityType || dialogueState.npcName.toLowerCase();
+            const response = await getAIResponse(npcType, option);
             
             setDialogueState((prev) => ({
                 ...prev,
-                message: response,
+                message: response || "I'm sorry, I seem to be distracted. What were you saying?",
                 options: [
                     "Tell me more",
                     "Ask another question",
