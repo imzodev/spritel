@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Basic reset */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+}
+
 /* Make sure on mobile the canvas has 0 margin and padding, but on desktop leave as it is using media queries */
 @media (max-width: 768px) {
   canvas {
