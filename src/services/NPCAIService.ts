@@ -10,19 +10,34 @@ export class NPCAIService {
         // No longer need to initialize AI service as we'll use the server API
     }
 
+    /**
+     * Get the default game context for AI interactions
+     */
+    public getGameContext(): GameContext {
+        return {
+            timeOfDay: 'day', // Could be dynamic based on game time
+            weather: 'clear', // Could be dynamic based on game weather
+            playerLevel: 1, // Could be dynamic based on player stats
+            location: 'village', // Could be dynamic based on map
+            activeQuests: ['tutorial'] // Could be dynamic based on quest log
+        };
+    }
+
     public async generateResponse(
         npcId: string, 
         playerMessage: string, 
         gameContext?: GameContext
     ): Promise<string> {
-        // First try to find personality by ID directly
-        let npcRole = npcId;
-
+        // Use npcId as the role type
+        const npcRole = npcId;
         const memory = this.getOrCreateMemory(npcId);
         
         try {
             // Format conversation history for the API call
             const conversationHistory = this.formatConversationHistory(memory);
+            
+            // Use provided game context or get the default one
+            const context = gameContext || this.getGameContext();
             
             // Make API request to the server
             const response = await fetch(`${API_URL}/api/ai/chat`, {
@@ -33,7 +48,7 @@ export class NPCAIService {
                 body: JSON.stringify({
                     personalityType: npcRole,
                     message: playerMessage,
-                    gameContext,
+                    gameContext: context,
                     conversationHistory
                 })
             });

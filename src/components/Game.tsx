@@ -4,22 +4,56 @@ import MobileControls from "./MobileControls";
 import DialogueBox from "./DialogueBox";
 import GameScene from "../scenes/GameScene";
 import { NPCAIService } from "../services/NPCAIService";
+import { DialogueManager, DialogueState } from "../managers/DialogueManager";
 
 const Game = () => {
     const gameContainerRef = useRef<HTMLDivElement>(null);
     // Removed unused gameInstance state
     const [gameScene, setGameScene] = useState<GameScene | null>(null);
-    const [dialogueState, setDialogueState] = useState({
+    const [dialogueState, setDialogueState] = useState<DialogueState>({
         isOpen: false,
         npcName: "",
-        personalityType: "", // Add personality type for AI responses
+        personalityType: "",
         message: "",
-        options: [] as string[],
+        options: [],
     });
     
     const aiService = useRef(new NPCAIService());
+    const dialogueManager = useRef<DialogueManager | null>(null);
 
 
+
+    // Initialize dialogue manager
+    useEffect(() => {
+        dialogueManager.current = new DialogueManager(
+            aiService.current,
+            dialogueState,
+            setDialogueState
+        );
+    }, []);
+
+    // Update dialogue manager when dialogue state changes
+    useEffect(() => {
+        if (dialogueManager.current) {
+            dialogueManager.current.updateDialogueState(dialogueState);
+        }
+    }, [dialogueState]);
+
+    // Initialize dialogue manager
+    useEffect(() => {
+        dialogueManager.current = new DialogueManager(
+            aiService.current,
+            dialogueState,
+            setDialogueState
+        );
+    }, []);
+
+    // Update dialogue manager when dialogue state changes
+    useEffect(() => {
+        if (dialogueManager.current) {
+            dialogueManager.current.updateDialogueState(dialogueState);
+        }
+    }, [dialogueState]);
 
     useEffect(() => {
         if (!gameContainerRef.current) return;
@@ -47,6 +81,9 @@ const Game = () => {
                 const scene = game.scene.getScene("GameScene") as GameScene;
                 if (scene) {
                     setGameScene(scene);
+                    if (dialogueManager.current) {
+                        dialogueManager.current.setGameScene(scene);
+                    }
                     return true;
                 }
             } catch (event) {
@@ -83,135 +120,32 @@ const Game = () => {
         };
     }, [gameScene]);
 
-    // Create a reusable function to get game context
-    const getGameContext = () => {
-        return {
-            timeOfDay: 'day', // Could be dynamic based on game time
-            weather: 'clear', // Could be dynamic based on game weather
-            playerLevel: 1, // Could be dynamic based on player stats
-            location: 'village', // Could be dynamic based on map
-            activeQuests: ['tutorial'] // Could be dynamic based on quest log
-        };
-    };
+    // AI service is now responsible for game context and response generation
 
-    // Create a reusable function to get AI response
-    const getAIResponse = async (npcType: string, message: string) => {
-        try {
-            return await aiService.current.generateResponse(
-                npcType,
-                message,
-                getGameContext()
-            );
-        } catch (error) {
-            console.error("[Game] Failed to get AI response:", error);
-            return null; // Return null to indicate failure
-        }
-    };
-
+    // Delegate NPC interaction handling to DialogueManager
     const handleNPCInteraction = async (data: {
         npcId: string;
         npcName: string;
         personalityType: string;
         context?: any;
     }) => {
-        console.log("[Game] Received NPC interaction event:", data);
-        // Pause the game scene
-        gameScene?.scene.pause();
-
-        // Get initial NPC response
-        try {
-            console.log('[Game] Setting dialogue state to open');
-            
-            // Default message and options
-            let initialMessage = "Hello traveler! How may I help you today?";
-            let options = [
-                "Tell me about yourself",
-                "What goods do you have?",
-                "Any interesting news?",
-                "Goodbye",
-            ];
-            
-            // Get AI-generated greeting
-            const aiResponse = await getAIResponse(
-                data.personalityType || 'merchant',
-                "Hello, I'm a new traveler here."
-            );
-            
-            if (aiResponse) {
-                initialMessage = aiResponse;
-            }
-            
-            setDialogueState(prev => {
-                console.log('[Game] Previous dialogue state:', prev);
-                const newState = {
-                    isOpen: true,
-                    npcName: data.npcName,
-                    personalityType: data.personalityType || 'merchant', // Store personality type for later use
-                    message: initialMessage,
-                    options: options,
-                };
-                console.log('[Game] New dialogue state:', newState);
-                return newState;
-            });
-        } catch (error) {
-            console.error("[Game] Failed to show dialogue:", error);
+        if (dialogueManager.current) {
+            await dialogueManager.current.handleNPCInteraction(data);
         }
     };
 
+    // Delegate dialogue option handling to DialogueManager
     const handleDialogueOption = async (option: string) => {
-        if (option === "Goodbye") {
-            handleCloseDialogue();
-            return;
-        }
-
-        // Show loading state
-        setDialogueState((prev) => ({
-            ...prev,
-            message: "...",
-            options: [], // Remove options while loading
-        }));
-
-        try {
-            // Use the stored personality type from dialogue state
-            const npcType = dialogueState.personalityType || dialogueState.npcName.toLowerCase();
-            const response = await getAIResponse(npcType, option);
-            
-            setDialogueState((prev) => ({
-                ...prev,
-                message: response || "I'm sorry, I seem to be distracted. What were you saying?",
-                options: [
-                    "Tell me more",
-                    "Ask another question",
-                    "Thank you",
-                    "Goodbye"
-                ],
-            }));
-        } catch (error) {
-            console.error("[Game] Failed to get dialogue response:", error);
-            setDialogueState((prev) => ({
-                ...prev,
-                message: "I'm sorry, I seem to be distracted. What were you saying?",
-                options: [
-                    "Tell me about yourself",
-                    "What goods do you have?",
-                    "Any interesting news?",
-                    "Goodbye",
-                ],
-            }));
+        if (dialogueManager.current) {
+            await dialogueManager.current.handleDialogueOption(option);
         }
     };
 
+    // Delegate dialogue closing to DialogueManager
     const handleCloseDialogue = () => {
-        // Just resume the scene
-        gameScene?.scene.resume();
-        
-        setDialogueState(prev => ({
-            ...prev,
-            isOpen: false,
-            npcName: '',
-            message: '',
-            options: []
-        }));
+        if (dialogueManager.current) {
+            dialogueManager.current.handleCloseDialogue();
+        }
     };
 
     // Handle mobile control events
