@@ -1,4 +1,3 @@
-import { NPC_PERSONALITIES, NPCPersonalityTemplate } from '../data/npc-personalities';
 import { GameContext, NPCMemory } from './ai';
 
 // Get API URL from environment variables
@@ -17,25 +16,7 @@ export class NPCAIService {
         gameContext?: GameContext
     ): Promise<string> {
         // First try to find personality by ID directly
-        let personality = NPC_PERSONALITIES[npcId];
-        
-        // If not found, try to find by name (case-insensitive)
-        if (!personality) {
-            const lowerNpcId = npcId.toLowerCase();
-            const match = Object.values(NPC_PERSONALITIES).find(
-                p => p.name.toLowerCase() === lowerNpcId
-            );
-            
-            if (match) {
-                personality = match;
-                npcId = match.id; // Use the correct ID for memory storage
-            }
-        }
-        
-        if (!personality) {
-            console.error(`No personality found for NPC: ${npcId}`);
-            throw new Error(`No personality template found for NPC: ${npcId}`);
-        }
+        let npcRole = npcId;
 
         const memory = this.getOrCreateMemory(npcId);
         
@@ -50,7 +31,7 @@ export class NPCAIService {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    personalityType: personality.role,
+                    personalityType: npcRole,
                     message: playerMessage,
                     gameContext,
                     conversationHistory
@@ -69,7 +50,7 @@ export class NPCAIService {
             return aiResponse;
         } catch (error) {
             console.error(`Failed to generate response for NPC ${npcId}:`, error);
-            return this.getFallbackResponse(personality);
+            return this.getFallbackResponse(npcRole);
         }
     }
 
@@ -124,13 +105,13 @@ export class NPCAIService {
         }
     }
 
-    private getFallbackResponse(personality: NPCPersonalityTemplate): string {
-        const fallbacks = {
+    private getFallbackResponse(role: string): string {
+        const fallbacks: Record<string, string> = {
             merchant: "I'm a bit busy with inventory right now. Come back in a moment?",
             innkeeper: "Just a moment, dear. Dealing with something in the kitchen.",
             blacksmith: "Can't talk now. In the middle of some delicate work."
         };
         
-        return fallbacks[personality.role] || "One moment, please.";
+        return fallbacks[role] || "One moment, please.";
     }
 }

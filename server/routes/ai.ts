@@ -1,27 +1,5 @@
 import { aiService } from '../services/AIService';
-
-// Define the NPC personality templates
-const personalityTemplates: Record<string, string> = {
-  merchant: `You are a friendly merchant in a fantasy RPG game. You sell various goods and items to travelers.
-Your name is Marcus. You've been a merchant for many years and know the area well.
-You speak in a friendly, slightly formal manner. You occasionally mention special deals or rare items.
-Keep your responses concise (1-3 sentences) and in-character.`,
-
-  guard: `You are a town guard in a fantasy RPG game. You protect the town from threats.
-Your name is Garrett. You've served as a guard for 10 years and take your duty seriously.
-You speak in a direct, authoritative manner. You occasionally mention recent security concerns.
-Keep your responses concise (1-3 sentences) and in-character.`,
-
-  innkeeper: `You are a welcoming innkeeper in a fantasy RPG game. You provide rooms and meals to travelers.
-Your name is Isabella. Your inn has been in your family for generations.
-You speak in a warm, hospitable manner. You occasionally mention special dishes or local gossip.
-Keep your responses concise (1-3 sentences) and in-character.`,
-
-  wizard: `You are a mysterious wizard in a fantasy RPG game. You study arcane arts and magical phenomena.
-Your name is Aldric. You've spent decades researching magical secrets.
-You speak in a cryptic, knowledgeable manner. You occasionally mention magical theories or strange occurrences.
-Keep your responses concise (1-3 sentences) and in-character.`,
-};
+import { NPC_PERSONALITIES } from '../data/npc-personalities';
 
 // Handle AI chat completion request
 export async function handleAIChatRequest(request: Request): Promise<Response> {
@@ -42,7 +20,9 @@ export async function handleAIChatRequest(request: Request): Promise<Response> {
     }
     
     // Get the appropriate system prompt based on personality type
-    const systemPrompt = personalityTemplates[personalityType.toLowerCase()] || personalityTemplates.merchant;
+    const personalityKey = personalityType.toLowerCase();
+    const personality = NPC_PERSONALITIES[personalityKey] || NPC_PERSONALITIES.merchant;
+    const systemPrompt = personality.systemPrompt;
     
     // Format the game context as additional information for the AI
     let contextPrompt = '';
@@ -101,7 +81,9 @@ export async function handleAIChatWithMemoryRequest(request: Request): Promise<R
     }
     
     // Get the appropriate system prompt based on personality type
-    const systemPrompt = personalityTemplates[personalityType.toLowerCase()] || personalityTemplates.merchant;
+    const personalityKey = personalityType.toLowerCase();
+    const personality = NPC_PERSONALITIES[personalityKey] || NPC_PERSONALITIES.merchant;
+    const systemPrompt = personality.systemPrompt;
     
     // Format the game context as additional information for the AI
     let contextPrompt = '';
@@ -122,10 +104,9 @@ export async function handleAIChatWithMemoryRequest(request: Request): Promise<R
     let messages: { role: string; content: string }[] = [];
     
     if (conversationHistory && Array.isArray(conversationHistory)) {
-      // Add conversation history
-      messages = conversationHistory.map((msg: any) => ({
-        role: msg.role as string,
-        content: msg.content as string
+      messages = conversationHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content
       }));
     }
     
