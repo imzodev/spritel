@@ -22,26 +22,53 @@ const DialogueBox = ({
     const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
     const dialogueRef = useRef<HTMLDivElement>(null);
 
+    // Track previous message length to handle streaming properly
+    const prevMessageLengthRef = useRef(0);
+
     useEffect(() => {
         if (isOpen && message) {
+            // Only reset animation if dialogue was closed or a completely new message starts
+            const isNewMessage = prevMessageLengthRef.current > message.length;
+            
+            if (isNewMessage) {
+                setIsTyping(true);
+                setDisplayedText(''); // Reset for new messages
+                prevMessageLengthRef.current = 0;
+            }
+            
+            // Only animate the new portion of text for streaming
+            const startIndex = isNewMessage ? 0 : prevMessageLengthRef.current;
+            let index = startIndex;
+            
+            // Update the ref to track message length
+            prevMessageLengthRef.current = message.length;
+            
+            // If we're already at the end of the message, no need to animate
+            if (index >= message.length) {
+                setDisplayedText(message);
+                setIsTyping(false);
+                return;
+            }
+            
             setIsTyping(true);
-            setDisplayedText(''); // Ensure reset
-            let index = 0;
-    
+            
             const intervalId = setInterval(() => {
                 if (index < message.length) {
-                    setDisplayedText(message.substring(0, index + 1)); // Fix issue
+                    setDisplayedText(message.substring(0, index + 1));
                     index++;
                 } else {
                     setIsTyping(false);
                     clearInterval(intervalId);
                 }
             }, 30); // Adjust typing speed here
-    
+            
             return () => {
                 clearInterval(intervalId);
-                setIsTyping(false);
             };
+        } else if (!isOpen) {
+            // Reset when dialogue closes
+            prevMessageLengthRef.current = 0;
+            setIsTyping(false);
         }
     }, [message, isOpen]);
 

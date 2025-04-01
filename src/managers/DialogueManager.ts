@@ -57,7 +57,6 @@ export class DialogueManager {
             console.log('[DialogueManager] Setting dialogue state to open');
             
             // Default message and options
-            let initialMessage = "Hello traveler! How may I help you today?";
             const options = [
                 "Tell me about yourself",
                 "What goods do you have?",
@@ -65,32 +64,57 @@ export class DialogueManager {
                 "Goodbye",
             ];
             
-            // Get AI-generated greeting
+            // First set the dialogue state with a loading message
+            this.setDialogueState(() => ({
+                isOpen: true,
+                npcName: data.npcName,
+                personalityType: data.personalityType || 'merchant', // Store personality type for later use
+                message: "...",
+                options: [], // No options while loading
+            }));
+            
+            // Get AI-generated greeting with streaming
             try {
-                initialMessage = await this.aiService.generateResponse(
+                await this.aiService.generateResponse(
                     data.personalityType || 'merchant',
-                    "Hello, I'm a new traveler here."
+                    "Hello, I'm a new traveler here.",
+                    undefined, // Use default game context
+                    this.handleStreamingResponse.bind(this) // Pass streaming callback
                 );
             } catch (error) {
                 console.error("[DialogueManager] Failed to get AI response:", error);
                 // Fall back to default greeting
-            }
-            
-            this.setDialogueState(prev => {
-                console.log('[DialogueManager] Previous dialogue state:', prev);
-                const newState = {
-                    isOpen: true,
-                    npcName: data.npcName,
-                    personalityType: data.personalityType || 'merchant', // Store personality type for later use
-                    message: initialMessage,
+                this.setDialogueState(prev => ({
+                    ...prev,
+                    message: "Hello traveler! How may I help you today?",
                     options: options,
-                };
-                console.log('[DialogueManager] New dialogue state:', newState);
-                return newState;
-            });
+                }));
+            }
         } catch (error) {
             console.error("[DialogueManager] Failed to show dialogue:", error);
         }
+    }
+    
+    /**
+     * Handle streaming response chunks
+     */
+    private handleStreamingResponse(chunk: string, isComplete: boolean): void {
+        this.setDialogueState(prev => {
+            // If this is the first chunk, replace the loading indicator
+            const currentMessage = prev.message === "..." ? chunk : prev.message + chunk;
+            
+            return {
+                ...prev,
+                message: currentMessage,
+                // Only show options when the response is complete
+                options: isComplete ? [
+                    "Tell me about yourself",
+                    "What goods do you have?",
+                    "Any interesting news?",
+                    "Goodbye",
+                ] : [],
+            };
+        });
     }
 
     /**
@@ -112,18 +136,16 @@ export class DialogueManager {
         try {
             // Use the stored personality type from dialogue state
             const npcType = this.dialogueState.personalityType || this.dialogueState.npcName.toLowerCase();
-            const response = await this.aiService.generateResponse(npcType, option);
             
-            this.setDialogueState((prev) => ({
-                ...prev,
-                message: response,
-                options: [
-                    "Tell me more",
-                    "Ask another question",
-                    "Thank you",
-                    "Goodbye"
-                ],
-            }));
+            // Use streaming response
+            await this.aiService.generateResponse(
+                npcType, 
+                option, 
+                undefined, // Use default game context
+                this.handleStreamingResponse.bind(this) // Pass streaming callback
+            );
+            
+            // Note: options are now added in the streaming callback when isComplete=true
         } catch (error) {
             console.error("[DialogueManager] Failed to get dialogue response:", error);
             this.setDialogueState((prev) => ({

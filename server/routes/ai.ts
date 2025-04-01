@@ -10,7 +10,7 @@ export async function handleAIChatRequest(request: Request): Promise<Response> {
     // Parse the request body
     const body = await request.json();
     console.log('[AI Route] Request body:', body);
-    const { personalityType, message, gameContext } = body;
+    const { personalityType, message, gameContext, stream = false } = body;
     
     if (!personalityType || !message) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -44,7 +44,29 @@ export async function handleAIChatRequest(request: Request): Promise<Response> {
       { role: 'user', content: message }
     ];
     
-    // Get the AI response
+    // If stream is true, return a streaming response
+    if (stream) {
+      try {
+        // Get the streaming response
+        const streamResponse = await aiService.streamChatCompletion(fullSystemPrompt, messages);
+        
+        return new Response(streamResponse, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          }
+        });
+      } catch (error) {
+        console.error('[AI Route] Error streaming AI chat response:', error);
+        return new Response(JSON.stringify({ error: 'Failed to stream AI response' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
+    // For non-streaming responses, get the AI response as before
     const response = await aiService.getChatCompletion(fullSystemPrompt, messages);
     
     // Return the response
