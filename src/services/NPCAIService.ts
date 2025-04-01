@@ -1,53 +1,98 @@
 import { NPC_PERSONALITIES, NPCPersonalityTemplate } from '../data/npc-personalities';
+import { GameContext, NPCMemory } from './ai';
+
+// Get API URL from environment variables
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export class NPCAIService {
     private memories: Map<string, NPCMemory> = new Map();
+    
+    constructor() {
+        // No longer need to initialize AI service as we'll use the server API
+    }
 
     public async generateResponse(
         npcId: string, 
         playerMessage: string, 
         gameContext?: GameContext
     ): Promise<string> {
-        const personality = NPC_PERSONALITIES[npcId];
+        // First try to find personality by ID directly
+        let personality = NPC_PERSONALITIES[npcId];
+        
+        // If not found, try to find by name (case-insensitive)
         if (!personality) {
+            const lowerNpcId = npcId.toLowerCase();
+            const match = Object.values(NPC_PERSONALITIES).find(
+                p => p.name.toLowerCase() === lowerNpcId
+            );
+            
+            if (match) {
+                personality = match;
+                npcId = match.id; // Use the correct ID for memory storage
+            }
+        }
+        
+        if (!personality) {
+            console.error(`No personality found for NPC: ${npcId}`);
             throw new Error(`No personality template found for NPC: ${npcId}`);
         }
 
         const memory = this.getOrCreateMemory(npcId);
-        const prompt = this.constructPrompt(personality, memory, playerMessage, gameContext);
-
+        
         try {
-            // Here you would make the actual OpenAI API call
-            const response = await this.callOpenAI(prompt);
-            this.updateMemory(npcId, playerMessage, response);
-            return response;
+            // Format conversation history for the API call
+            const conversationHistory = this.formatConversationHistory(memory);
+            
+            // Make API request to the server
+            const response = await fetch(`${API_URL}/api/ai/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    personalityType: personality.role,
+                    message: playerMessage,
+                    gameContext,
+                    conversationHistory
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const aiResponse = data.response;
+            
+            // Update memory with the new exchange
+            this.updateMemory(npcId, playerMessage, aiResponse);
+            return aiResponse;
         } catch (error) {
             console.error(`Failed to generate response for NPC ${npcId}:`, error);
             return this.getFallbackResponse(personality);
         }
     }
 
-    private constructPrompt(
-        personality: NPCPersonalityTemplate,
-        memory: NPCMemory,
-        playerMessage: string,
-        gameContext?: GameContext
-    ): string {
-        const recentMessages = memory.conversationHistory
-            .slice(-6) // Keep last 3 exchanges (6 messages)
-            .join('\n');
-
-        return `${personality.systemPrompt}
-
-Recent conversation:
-${recentMessages}
-
-Game context:
-${this.formatGameContext(gameContext)}
-
-Player: ${playerMessage}
-
-Response as ${personality.name}:`;
+    /**
+     * Format the conversation history into a format suitable for the OpenAI API
+     */
+    private formatConversationHistory(memory: NPCMemory): Array<{ role: 'user' | 'assistant'; content: string }> {
+        const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+        
+        // Get the last 6 messages (3 exchanges) from conversation history
+        const recentMessages = memory.conversationHistory.slice(-6);
+        
+        // Convert to the format expected by OpenAI API
+        for (let i = 0; i < recentMessages.length; i++) {
+            // Even indices are player messages, odd indices are NPC responses
+            const role = i % 2 === 0 ? 'user' : 'assistant';
+            messages.push({
+                role,
+                content: recentMessages[i]
+            });
+        }
+        
+        return messages;
     }
 
     private getOrCreateMemory(npcId: string): NPCMemory {
@@ -61,14 +106,22 @@ Response as ${personality.name}:`;
         return this.memories.get(npcId)!;
     }
 
-    private formatGameContext(context?: GameContext): string {
-        if (!context) return 'No specific context';
+    // formatGameContext is now handled on the server side
+
+    private updateMemory(npcId: string, playerMessage: string, npcResponse: string): void {
+        const memory = this.getOrCreateMemory(npcId);
+        memory.conversationHistory.push(playerMessage);
+        memory.conversationHistory.push(npcResponse);
+        memory.playerInteractions.push(playerMessage);
+        memory.lastInteraction = Date.now();
         
-        return `Time: ${context.timeOfDay}
-Weather: ${context.weather}
-Player Level: ${context.playerLevel}
-Location: ${context.location}
-Active Quests: ${context.activeQuests.join(', ')}`;
+        // Limit memory size to prevent it from growing too large
+        if (memory.conversationHistory.length > 20) {
+            memory.conversationHistory = memory.conversationHistory.slice(-20);
+        }
+        if (memory.playerInteractions.length > 10) {
+            memory.playerInteractions = memory.playerInteractions.slice(-10);
+        }
     }
 
     private getFallbackResponse(personality: NPCPersonalityTemplate): string {

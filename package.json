@@ -15,7 +15,12 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
     "@tailwindcss/vite": "^4.0.9",
+    "axios": "^1.8.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "openai": "^4.91.0",
     "phaser": "^3.88.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

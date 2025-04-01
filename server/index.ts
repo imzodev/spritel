@@ -1,4 +1,6 @@
 import { Server } from "bun";
+import { handleAIChatRequest, handleAIChatWithMemoryRequest } from "./routes/ai";
+import { cors } from "./middleware/cors";
 import { NPCState, TilePosition, NPCMovementState } from '../src/types/npc';
 
 // Constants for tile-based calculations
@@ -217,15 +219,46 @@ function logGameState() {
   console.log('========================\n');
 }
 
+// HTTP routes handler
+async function handleHttpRequest(req: Request): Promise<Response> {
+  // Handle preflight OPTIONS request for CORS
+  if (req.method === 'OPTIONS') {
+    return cors(new Response(null, { status: 204 }));
+  }
+
+  const url = new URL(req.url);
+  console.log(`[Server] Received HTTP request: ${req.method} ${url.pathname}`);
+  
+  // AI API routes
+  if (url.pathname === '/api/ai/chat') {
+    console.log('[Server] Handling AI chat request');
+    const response = await handleAIChatRequest(req);
+    return cors(response);
+  }
+  
+  if (url.pathname === '/api/ai/chat-with-memory') {
+    console.log('[Server] Handling AI chat with memory request');
+    const response = await handleAIChatWithMemoryRequest(req);
+    return cors(response);
+  }
+  
+  // Default response for unknown routes
+  console.log(`[Server] Route not found: ${url.pathname}`);
+  return cors(new Response('Not Found', { status: 404 }));
+}
+
 const server = Bun.serve<{ id: string }>({
   port: 3001,
   fetch(req, server) {
+    // Try to upgrade to WebSocket
     if (server.upgrade(req, {
       data: { id: crypto.randomUUID() }
     })) {
       return;
     }
-    return new Response("Upgrade failed", { status: 500 });
+    
+    // If not a WebSocket request, handle as HTTP API request
+    return handleHttpRequest(req);
   },
   websocket: {
     open(ws) {

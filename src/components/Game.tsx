@@ -7,7 +7,7 @@ import { NPCAIService } from "../services/NPCAIService";
 
 const Game = () => {
     const gameContainerRef = useRef<HTMLDivElement>(null);
-    const [gameInstance, setGameInstance] = useState<Phaser.Game | null>(null);
+    // Removed unused gameInstance state
     const [gameScene, setGameScene] = useState<GameScene | null>(null);
     const [dialogueState, setDialogueState] = useState({
         isOpen: false,
@@ -17,6 +17,8 @@ const Game = () => {
     });
     
     const aiService = useRef(new NPCAIService());
+
+
 
     useEffect(() => {
         if (!gameContainerRef.current) return;
@@ -38,7 +40,6 @@ const Game = () => {
         };
 
         const game = new Phaser.Game(config);
-        setGameInstance(game);
 
         const checkForScene = () => {
             try {
@@ -94,18 +95,44 @@ const Game = () => {
         // Get initial NPC response
         try {
             console.log('[Game] Setting dialogue state to open');
+            
+            // Create game context for the NPC
+            const gameContext = {
+                timeOfDay: 'day', // Could be dynamic based on game time
+                weather: 'clear', // Could be dynamic based on game weather
+                playerLevel: 1, // Could be dynamic based on player stats
+                location: 'village', // Could be dynamic based on map
+                activeQuests: ['tutorial'] // Could be dynamic based on quest log
+            };
+            
+            // Default message and options
+            let initialMessage = "Hello traveler! How may I help you today?";
+            let options = [
+                "Tell me about yourself",
+                "What goods do you have?",
+                "Any interesting news?",
+                "Goodbye",
+            ];
+            
+            try {
+                // Get AI-generated greeting from the NPC using our AI service
+                initialMessage = await aiService.current.generateResponse(
+                    data.personalityType || 'merchant',
+                    "Hello, I'm a new traveler here.",
+                    gameContext
+                );
+            } catch (error) {
+                console.error("[Game] Failed to get AI response:", error);
+                // Fall back to default greeting
+            }
+            
             setDialogueState(prev => {
                 console.log('[Game] Previous dialogue state:', prev);
                 const newState = {
                     isOpen: true,
                     npcName: data.npcName,
-                    message: "Hello traveler! How may I help you today?",
-                    options: [
-                        "Tell me about yourself",
-                        "What goods do you have?",
-                        "Any interesting news?",
-                        "Goodbye",
-                    ],
+                    message: initialMessage,
+                    options: options,
                 };
                 console.log('[Game] New dialogue state:', newState);
                 return newState;
@@ -121,10 +148,52 @@ const Game = () => {
             return;
         }
 
+        // Show loading state
         setDialogueState((prev) => ({
             ...prev,
-            message: `You selected: ${option}`,
+            message: "...",
+            options: [], // Remove options while loading
         }));
+
+        // Create game context for the NPC
+        const gameContext = {
+            timeOfDay: 'day',
+            weather: 'clear',
+            playerLevel: 1,
+            location: 'village',
+            activeQuests: ['tutorial']
+        };
+
+        try {
+            const response = await aiService.current.generateResponse(
+                dialogueState.npcName.toLowerCase(),
+                option,
+                gameContext
+            );
+            
+            setDialogueState((prev) => ({
+                ...prev,
+                message: response,
+                options: [
+                    "Tell me more",
+                    "Ask another question",
+                    "Thank you",
+                    "Goodbye"
+                ],
+            }));
+        } catch (error) {
+            console.error("[Game] Failed to get dialogue response:", error);
+            setDialogueState((prev) => ({
+                ...prev,
+                message: "I'm sorry, I seem to be distracted. What were you saying?",
+                options: [
+                    "Tell me about yourself",
+                    "What goods do you have?",
+                    "Any interesting news?",
+                    "Goodbye",
+                ],
+            }));
+        }
     };
 
     const handleCloseDialogue = () => {
@@ -150,6 +219,8 @@ const Game = () => {
         if (!gameScene) return;
         gameScene.triggerVirtualAttack();
     };
+
+
 
     return (
         <div className="relative w-full h-full">
@@ -178,6 +249,8 @@ const Game = () => {
                     isOpen={dialogueState.isOpen}
                 />
             </div>
+
+
         </div>
     );
 };
