@@ -127,7 +127,6 @@ const DialogueBox = ({
         fixed bottom-0 left-0 right-0 p-4 
         bg-gray-900/95 text-white
         border-t-2 border-gray-700 
-        overflow-y-visible
         z-50 pointer-events-auto
         ${isOpen ? "block" : "hidden"}
     `}
@@ -151,16 +150,31 @@ const DialogueBox = ({
                 {isTyping && <span className="animate-pulse">▋</span>}
             </div>
 
-            <div className="flex flex-col gap-2">
-                {options.map((option, index) => (
-                    <button
-                        key={index}
-                        onClick={() => onOptionSelect?.(option)}
-                        className={`text-left p-2 rounded transition-colors ${index === selectedOptionIndex ? 'bg-gray-700 border-l-4 border-yellow-400' : 'hover:bg-gray-700'}`}
-                    >
-                        {option}
-                    </button>
-                ))}
+            {/* Fixed space for 4 options - always the same height */}
+            <div className="min-h-[180px]">
+                {!isTyping ? (
+                    <div className="space-y-2">
+                        {options.map((option, index) => (
+                            <button
+                                key={index}
+                                onClick={() => onOptionSelect?.(option)}
+                                className={`text-left p-2 rounded w-full transition-colors ${index === selectedOptionIndex ? 'bg-gray-700 border-l-4 border-yellow-400' : 'hover:bg-gray-700'}`}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="space-y-2 opacity-40">
+                        {/* Always show 4 placeholder options */}
+                        {[...Array(4)].map((_, index) => (
+                            <div 
+                                key={index} 
+                                className="text-left p-2 rounded bg-gray-800 h-10"
+                            ></div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
