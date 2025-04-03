@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: spritel-app
+    runtime: bun
+    buildCommand: bun install
+    startCommand: bun run server
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /healthz
+    autoDeploy: true
