@@ -221,30 +221,41 @@ function logGameState() {
 
 // HTTP routes handler
 async function handleHttpRequest(req: Request): Promise<Response> {
-  // Handle preflight OPTIONS request for CORS
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return cors(new Response(null, { status: 204 }));
+    return new Response(null, { headers: cors(req.headers) });
   }
 
-  const url = new URL(req.url);
-  console.log(`[Server] Received HTTP request: ${req.method} ${url.pathname}`);
-  
-  // AI API routes
-  if (url.pathname === '/api/ai/chat') {
-    console.log('[Server] Handling AI chat request');
-    const response = await handleAIChatRequest(req);
-    return cors(response);
+  let response: Response;
+
+  // Serve frontend for root route
+  if (req.url.endsWith('/')) {
+    try {
+      const file = await Bun.file('./dist/index.html');
+      response = new Response(file, {
+        headers: { 'Content-Type': 'text/html' }
+      });
+    } catch (err) {
+      response = new Response('Not Found', { status: 404 });
+    }
   }
-  
-  if (url.pathname === '/api/ai/chat-with-memory') {
-    console.log('[Server] Handling AI chat with memory request');
-    const response = await handleAIChatWithMemoryRequest(req);
-    return cors(response);
+  // Handle AI chat requests
+  else if (req.url.includes('/api/ai/chat')) {
+    response = await handleAIChatRequest(req);
   }
-  
-  // Default response for unknown routes
-  console.log(`[Server] Route not found: ${url.pathname}`);
-  return cors(new Response('Not Found', { status: 404 }));
+  else if (req.url.includes('/api/ai/chat-with-memory')) {
+    response = await handleAIChatWithMemoryRequest(req);
+  }
+  else {
+    response = new Response('Route not found', { status: 404 });
+  }
+
+  // Add CORS headers to all responses
+  Object.entries(cors(req.headers)).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+
+  return response;
 }
 
 const server = Bun.serve<{ id: string }>({
