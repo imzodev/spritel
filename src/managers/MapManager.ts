@@ -3,6 +3,9 @@ import { MapData, MapCoordinate, AdjacentMaps } from "../types/GameTypes";
 import GameScene from "../scenes/GameScene";
 
 export class MapManager {
+    private recentlyTransitioned: boolean = false;
+    private transitionCooldownMs: number = 200; // 200ms cooldown to prevent retrigger
+
     private scene: GameScene;
     private currentMap: MapData | null;
     private currentPosition: MapCoordinate;
@@ -292,8 +295,9 @@ export class MapManager {
         );
     }
 
+    // Restore checkMapTransition
     public checkMapTransition(player: Phaser.Physics.Arcade.Sprite): void {
-        if (!this.currentMap || this.isTransitioning) return;
+        if (!this.currentMap || this.isTransitioning || this.recentlyTransitioned) return;
 
         const mapWidth = this.mapDimensions.width * this.tileSize;
         const mapHeight = this.mapDimensions.height * this.tileSize;
@@ -314,7 +318,12 @@ export class MapManager {
         direction: "north" | "south" | "east" | "west",
         player: Phaser.Physics.Arcade.Sprite
     ): Promise<void> {
-        if (this.isTransitioning) return;
+        if (this.isTransitioning || this.recentlyTransitioned) return;
+
+        this.recentlyTransitioned = true;
+        setTimeout(() => {
+            this.recentlyTransitioned = false;
+        }, this.transitionCooldownMs);
 
         try {
             this.isTransitioning = true;
@@ -371,13 +380,28 @@ export class MapManager {
         }
     }
 
-    private bouncePlayer(
-        player: Phaser.Physics.Arcade.Sprite,
-        direction: string
-    ): void {
+    private calculateNewPosition(direction: string): MapCoordinate {
+        const newPosition = { ...this.currentPosition };
+        switch (direction) {
+            case "north":
+                newPosition.y++;
+                break;
+            case "south":
+                newPosition.y--;
+                break;
+            case "east":
+                newPosition.x++;
+                break;
+            case "west":
+                newPosition.x--;
+                break;
+        }
+        return newPosition;
+    }
+
+    private bouncePlayer(player: Phaser.Physics.Arcade.Sprite, direction: string): void {
         const bounceDistance = 10;
         const bounceSpeed = 100;
-
         switch (direction) {
             case "north":
                 player.setVelocityY(bounceSpeed);
@@ -396,21 +420,13 @@ export class MapManager {
                 player.x += bounceDistance;
                 break;
         }
-
         // Reset velocity after a short delay
         setTimeout(() => {
             player.setVelocity(0, 0);
         }, 100);
     }
 
-    public getCurrentMap(): { key: string; data: MapData } | null {
-        if (!this.currentMap) return null;
-        return {
-            key: this.getMapKey(this.currentPosition.x, this.currentPosition.y),
-            data: this.currentMap,
-        };
-    }
-
+    // Restore preloadAdjacentMaps
     private async preloadAdjacentMaps(): Promise<void> {
         const adjacentMaps = this.getAdjacentMaps();
         const preloadPromises: Promise<void>[] = [];
@@ -454,26 +470,7 @@ export class MapManager {
         await Promise.all(preloadPromises);
     }
 
-    private calculateNewPosition(direction: string): MapCoordinate {
-        const newPosition = { ...this.currentPosition };
 
-        switch (direction) {
-            case "north":
-                newPosition.y++;
-                break;
-            case "south":
-                newPosition.y--;
-                break;
-            case "east":
-                newPosition.x++;
-                break;
-            case "west":
-                newPosition.x--;
-                break;
-        }
-
-        return newPosition;
-    }
 
     private calculatePlayerTransitionPosition(
         player: Phaser.Physics.Arcade.Sprite,
@@ -484,18 +481,19 @@ export class MapManager {
 
         switch (direction) {
             case "north":
-                return { x: player.x, y: mapHeight - this.tileSize * 2 };
+                return { x: player.x, y: mapHeight - this.tileSize };
             case "south":
-                return { x: player.x, y: this.tileSize * 2 };
+                return { x: player.x, y: this.tileSize };
             case "east":
-                return { x: this.tileSize * 2, y: player.y };
+                return { x: this.tileSize, y: player.y };
             case "west":
-                return { x: mapWidth - this.tileSize * 2, y: player.y };
+                return { x: mapWidth - this.tileSize, y: player.y };
             default:
                 return { x: player.x, y: player.y };
         }
     }
 
+    // ... (rest of the code remains the same)
     public getMapWidth(): number {
         return this.mapDimensions.width * this.tileSize;
     }

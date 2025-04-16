@@ -295,6 +295,11 @@ export class NPC {
     
     // This function pushes the NPC away from any map edge it's touching
     private pushAwayFromEdge(): void {
+    // Guard: Ensure sprite and body exist
+    if (!this.sprite || !this.sprite.body) {
+        console.warn(`[NPC] pushAwayFromEdge: sprite or body is undefined`, this);
+        return;
+    }
         const body = this.sprite.body as Phaser.Physics.Arcade.Body;
         const buffer = TILE_SIZE * NPC_BUFFER_TILES;
         
