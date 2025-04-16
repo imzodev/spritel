@@ -83,6 +83,12 @@ export class NPC {
         
         // Listen for movement instructions from NetworkManager instead of game events
         this.scene.getNetworkManager().on('npc-movement-instruction', (data: any) => {
+            // Only handle if this NPC is still present in the scene's NPCManager
+            const npcManager = this.scene.getNPCManager && this.scene.getNPCManager();
+            if (!npcManager || !npcManager.getNPC(this.config.id)) {
+                // NPC is not present in the current map, ignore
+                return;
+            }
             if (data.npcId === this.config.id) {
                 this.handleMovementInstruction(data);
             }
@@ -565,6 +571,11 @@ export class NPC {
         facing: string,
         state: string
     }): void {
+        // Guard: Ensure sprite and body exist
+        if (!this.sprite || !this.sprite.body) {
+            // Suppress warning if NPC is not present in the current map (likely already destroyed)
+            return;
+        }
         // Check if we need to push the NPC away from the edge before applying new movement
         this.pushAwayFromEdge();
         

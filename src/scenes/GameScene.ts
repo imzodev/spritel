@@ -359,14 +359,8 @@ export default class GameScene extends Phaser.Scene {
             }
             
             // Only handle updates for players in our current map
-            const currentMapData = this.mapManager.getCurrentMap();
-            if (!currentMapData) return;
-
-            const [_, currentX, currentY] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
-            const currentMap = { 
-                x: parseInt(currentX), 
-                y: parseInt(currentY) 
-            };
+            const currentMap = this.mapManager.getCurrentPosition();
+            if (!currentMap) return;
 
             if (data.player.mapPosition.x === currentMap.x && 
                 data.player.mapPosition.y === currentMap.y) {
@@ -480,18 +474,11 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Get current map position
-        const currentMapData = this.mapManager.getCurrentMap();
-        if (!currentMapData) {
-            console.warn('[HandlePlayerUpdate] No current map data available');
+        const currentMap = this.mapManager.getCurrentPosition();
+        if (!currentMap) {
+            console.warn('[HandlePlayerUpdate] No current map position available');
             return;
         }
-
-        // Extract current map coordinates
-        const [_, currentX, currentY] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
-        const currentMap = { 
-            x: parseInt(currentX), 
-            y: parseInt(currentY) 
-        };
         
         // If player is in a different map, remove their sprite
         if (!playerData.mapPosition || 
@@ -806,11 +793,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private isSameMap(otherMapPosition: { x: number, y: number }): boolean {
-        const currentMapData = this.mapManager.getCurrentMap();
-        if (!currentMapData) return false;
-        
-        const [_, x, y] = currentMapData.key.match(/map_(-?\d+)_(-?\d+)/) || [];
-        return parseInt(x) === otherMapPosition.x && parseInt(y) === otherMapPosition.y;
+        const currentMap = this.mapManager.getCurrentPosition();
+        if (!currentMap) return false;
+        return currentMap.x === otherMapPosition.x && currentMap.y === otherMapPosition.y;
     }
 
     public handleNPCInteraction(npc: NPC): void {
