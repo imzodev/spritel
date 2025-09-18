@@ -26,6 +26,17 @@ export class DialogueManager {
     private gameScene: GameScene | null = null;
     private dialogueState: DialogueState;
     private setDialogueState: (state: DialogueState | ((prevState: DialogueState) => DialogueState)) => void;
+    
+    // Centralized default options to avoid repetition
+    private getDefaultOptions(): string[] {
+        return [
+            "Tell me about yourself",
+            "What goods do you have?",
+            "Any interesting news?",
+            "Custom message...",
+            "Goodbye",
+        ];
+    }
 
     constructor(
         aiService: NPCAIService,
@@ -58,13 +69,7 @@ export class DialogueManager {
             console.log('[DialogueManager] Setting dialogue state to open');
             
             // Default message and options
-            const options = [
-                "Tell me about yourself",
-                "What goods do you have?",
-                "Any interesting news?",
-                "Custom message...",
-                "Goodbye",
-            ];
+            const options = this.getDefaultOptions();
             
             // First set the dialogue state with a loading message
             this.setDialogueState(() => ({
@@ -111,16 +116,20 @@ export class DialogueManager {
                 ...prev,
                 message: currentMessage,
                 // Only show options when the response is complete
-                options: isComplete ? [
-                    "Tell me about yourself",
-                    "What goods do you have?",
-                    "Any interesting news?",
-                    "Custom message...",
-                    "Goodbye",
-                ] : [],
+                options: isComplete ? this.getDefaultOptions() : [],
                 awaitingCustomInput: isComplete ? false : prev.awaitingCustomInput,
             };
         });
+    }
+
+    // Helper to show loading state while awaiting AI response
+    private showLoadingState(): void {
+        this.setDialogueState((prev) => ({
+            ...prev,
+            message: "...",
+            options: [],
+            awaitingCustomInput: false,
+        }));
     }
 
     /**
@@ -147,11 +156,7 @@ export class DialogueManager {
         }
 
         // Show loading state
-        this.setDialogueState((prev) => ({
-            ...prev,
-            message: "...",
-            options: [], // Remove options while loading
-        }));
+        this.showLoadingState();
 
         try {
             // Use the stored personality type from dialogue state
@@ -171,13 +176,7 @@ export class DialogueManager {
             this.setDialogueState((prev) => ({
                 ...prev,
                 message: "I'm sorry, I seem to be distracted. What were you saying?",
-                options: [
-                    "Tell me about yourself",
-                    "What goods do you have?",
-                    "Any interesting news?",
-                    "Custom message...",
-                    "Goodbye",
-                ],
+                options: this.getDefaultOptions(),
                 awaitingCustomInput: false,
             }));
         }
@@ -218,13 +217,7 @@ export class DialogueManager {
             this.setDialogueState((prev) => ({
                 ...prev,
                 message: "Hmm, I didn't catch that. Care to try again?",
-                options: [
-                    "Tell me about yourself",
-                    "What goods do you have?",
-                    "Any interesting news?",
-                    "Custom message...",
-                    "Goodbye",
-                ],
+                options: this.getDefaultOptions(),
                 awaitingCustomInput: false,
             }));
             // Ensure keyboard is re-enabled on error
@@ -241,13 +234,7 @@ export class DialogueManager {
         this.setDialogueState((prev) => ({
             ...prev,
             awaitingCustomInput: false,
-            options: [
-                "Tell me about yourself",
-                "What goods do you have?",
-                "Any interesting news?",
-                "Custom message...",
-                "Goodbye",
-            ],
+            options: this.getDefaultOptions(),
         }));
         // Re-enable Phaser keyboard when exiting input mode
         if (this.gameScene && this.gameScene.input && this.gameScene.input.keyboard) {
