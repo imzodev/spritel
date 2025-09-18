@@ -16,6 +16,7 @@ const Game = () => {
         personalityType: "",
         message: "",
         options: [],
+        awaitingCustomInput: false,
     });
     
     const aiService = useRef(new NPCAIService());
@@ -141,6 +142,20 @@ const Game = () => {
         }
     };
 
+    // Submit a custom message
+    const handleSubmitCustom = async (text: string) => {
+        if (dialogueManager.current) {
+            await dialogueManager.current.handleCustomMessage(text);
+        }
+    };
+
+    // Cancel custom message mode
+    const handleCancelCustom = () => {
+        if (dialogueManager.current) {
+            dialogueManager.current.cancelCustomMessage();
+        }
+    };
+
     // Delegate dialogue closing to DialogueManager
     const handleCloseDialogue = () => {
         if (dialogueManager.current) {
@@ -186,6 +201,9 @@ const Game = () => {
                     onOptionSelect={handleDialogueOption}
                     onClose={handleCloseDialogue}
                     isOpen={dialogueState.isOpen}
+                    awaitingCustomInput={dialogueState.awaitingCustomInput}
+                    onSubmitCustom={handleSubmitCustom}
+                    onCancelCustom={handleCancelCustom}
                 />
             </div>
 

@@ -7,6 +7,7 @@ export interface DialogueState {
     personalityType: string;
     message: string;
     options: string[];
+    awaitingCustomInput?: boolean;
 }
 
 export interface NPCInteractionData {
@@ -61,6 +62,7 @@ export class DialogueManager {
                 "Tell me about yourself",
                 "What goods do you have?",
                 "Any interesting news?",
+                "Custom message...",
                 "Goodbye",
             ];
             
@@ -71,6 +73,7 @@ export class DialogueManager {
                 personalityType: data.personalityType || 'merchant', // Store personality type for later use
                 message: "...",
                 options: [], // No options while loading
+                awaitingCustomInput: false,
             }));
             
             // Get AI-generated greeting with streaming
@@ -88,6 +91,7 @@ export class DialogueManager {
                     ...prev,
                     message: "Hello traveler! How may I help you today?",
                     options: options,
+                    awaitingCustomInput: false,
                 }));
             }
         } catch (error) {
@@ -111,8 +115,10 @@ export class DialogueManager {
                     "Tell me about yourself",
                     "What goods do you have?",
                     "Any interesting news?",
+                    "Custom message...",
                     "Goodbye",
                 ] : [],
+                awaitingCustomInput: isComplete ? false : prev.awaitingCustomInput,
             };
         });
     }
@@ -121,6 +127,20 @@ export class DialogueManager {
      * Handle dialogue option selection
      */
     public async handleDialogueOption(option: string): Promise<void> {
+        if (option === "Custom message...") {
+            // Enter custom input mode
+            this.setDialogueState((prev) => ({
+                ...prev,
+                awaitingCustomInput: true,
+                options: [],
+                message: "Type your message below and press Enter or Send.",
+            }));
+            // Disable Phaser keyboard while typing custom input
+            if (this.gameScene && this.gameScene.input && this.gameScene.input.keyboard) {
+                this.gameScene.input.keyboard.enabled = false;
+            }
+            return;
+        }
         if (option === "Goodbye") {
             this.handleCloseDialogue();
             return;
@@ -155,9 +175,83 @@ export class DialogueManager {
                     "Tell me about yourself",
                     "What goods do you have?",
                     "Any interesting news?",
+                    "Custom message...",
                     "Goodbye",
                 ],
+                awaitingCustomInput: false,
             }));
+        }
+    }
+
+    /**
+     * Submit a custom free-form message from the user
+     */
+    public async handleCustomMessage(message: string): Promise<void> {
+        if (!message || message.trim().length === 0) {
+            // Ignore empty submissions, keep input open
+            return;
+        }
+
+        // Show loading state and exit input mode
+        this.setDialogueState((prev) => ({
+            ...prev,
+            message: "...",
+            options: [],
+            awaitingCustomInput: false,
+        }));
+
+        // Re-enable Phaser keyboard now that we're leaving input mode
+        if (this.gameScene && this.gameScene.input && this.gameScene.input.keyboard) {
+            this.gameScene.input.keyboard.enabled = true;
+        }
+
+        try {
+            const npcType = this.dialogueState.personalityType || this.dialogueState.npcName.toLowerCase();
+            await this.aiService.generateResponse(
+                npcType,
+                message,
+                undefined,
+                this.handleStreamingResponse.bind(this)
+            );
+        } catch (error) {
+            console.error("[DialogueManager] Failed to get dialogue response for custom message:", error);
+            this.setDialogueState((prev) => ({
+                ...prev,
+                message: "Hmm, I didn't catch that. Care to try again?",
+                options: [
+                    "Tell me about yourself",
+                    "What goods do you have?",
+                    "Any interesting news?",
+                    "Custom message...",
+                    "Goodbye",
+                ],
+                awaitingCustomInput: false,
+            }));
+            // Ensure keyboard is re-enabled on error
+            if (this.gameScene && this.gameScene.input && this.gameScene.input.keyboard) {
+                this.gameScene.input.keyboard.enabled = true;
+            }
+        }
+    }
+
+    /**
+     * Cancel custom message input and restore options
+     */
+    public cancelCustomMessage(): void {
+        this.setDialogueState((prev) => ({
+            ...prev,
+            awaitingCustomInput: false,
+            options: [
+                "Tell me about yourself",
+                "What goods do you have?",
+                "Any interesting news?",
+                "Custom message...",
+                "Goodbye",
+            ],
+        }));
+        // Re-enable Phaser keyboard when exiting input mode
+        if (this.gameScene && this.gameScene.input && this.gameScene.input.keyboard) {
+            this.gameScene.input.keyboard.enabled = true;
         }
     }
 
@@ -167,6 +261,10 @@ export class DialogueManager {
     public handleCloseDialogue(): void {
         // Just resume the scene
         this.gameScene?.scene.resume();
+        // Ensure keyboard is enabled when closing dialogue
+        if (this.gameScene && this.gameScene.input && this.gameScene.input.keyboard) {
+            this.gameScene.input.keyboard.enabled = true;
+        }
         
         // Reset dialogue state
         this.setDialogueState((prev) => ({

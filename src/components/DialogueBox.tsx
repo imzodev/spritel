@@ -7,6 +7,9 @@ interface DialogueBoxProps {
     onOptionSelect?: (option: string) => void;
     onClose: () => void;
     isOpen: boolean;
+    awaitingCustomInput?: boolean;
+    onSubmitCustom?: (text: string) => void;
+    onCancelCustom?: () => void;
 }
 
 const DialogueBox = ({
@@ -16,11 +19,15 @@ const DialogueBox = ({
     onOptionSelect,
     onClose,
     isOpen,
+    awaitingCustomInput = false,
+    onSubmitCustom,
+    onCancelCustom,
 }: DialogueBoxProps) => {
     const [isTyping, setIsTyping] = useState(false);
     const [displayedText, setDisplayedText] = useState("");
     const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
     const dialogueRef = useRef<HTMLDivElement>(null);
+    const [customText, setCustomText] = useState("");
 
     // Track previous message length to handle streaming properly
     const prevMessageLengthRef = useRef(0);
@@ -77,9 +84,24 @@ const DialogueBox = ({
         setSelectedOptionIndex(0);
     }, [isOpen, options]);
 
+    // Reset and focus input when entering custom input mode
+    const inputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        if (awaitingCustomInput) {
+            setCustomText("");
+            // Focus after render
+            setTimeout(() => inputRef.current?.focus(), 0);
+        }
+    }, [awaitingCustomInput]);
+
     // Handle keyboard navigation
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
         if (!isOpen) return;
+
+        // When awaiting custom input, ignore global navigation keys
+        if (awaitingCustomInput) {
+            return;
+        }
 
         switch (e.key) {
             case 'Escape':
@@ -108,7 +130,7 @@ const DialogueBox = ({
                 }
                 break;
         }
-    }, [isOpen, isTyping, options, onOptionSelect, selectedOptionIndex, onClose]);
+    }, [isOpen, isTyping, options, onOptionSelect, selectedOptionIndex, onClose, awaitingCustomInput]);
     
 
     // Add event listener for keyboard navigation
@@ -152,7 +174,49 @@ const DialogueBox = ({
 
             {/* Fixed space for 4 options - always the same height */}
             <div className="min-h-[180px]">
-                {!isTyping ? (
+                {awaitingCustomInput ? (
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <input
+                                ref={inputRef}
+                                value={customText}
+                                onChange={(e) => setCustomText(e.target.value)}
+                                onKeyDown={(e) => {
+                                    // Stop propagation so Phaser/global handlers don't see the event
+                                    e.stopPropagation();
+                                    // @ts-ignore - access nativeEvent for immediate stop
+                                    if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                                        e.nativeEvent.stopImmediatePropagation();
+                                    }
+
+                                    // Allow normal typing (including Space/E/etc). Only prevent default for control keys
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        onSubmitCustom?.(customText.trim());
+                                    } else if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        onCancelCustom?.();
+                                    }
+                                }}
+                                placeholder="Type your message..."
+                                className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-yellow-400"
+                            />
+                            <button
+                                onClick={() => onSubmitCustom?.(customText.trim())}
+                                className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black rounded"
+                            >
+                                Send
+                            </button>
+                            <button
+                                onClick={() => onCancelCustom?.()}
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                        <p className="text-sm text-gray-400">Press Enter to send, Esc to cancel</p>
+                    </div>
+                ) : !isTyping ? (
                     <div className="space-y-2">
                         {options.map((option, index) => (
                             <button
@@ -166,7 +230,6 @@ const DialogueBox = ({
                     </div>
                 ) : (
                     <div className="space-y-2 opacity-40">
-                        {/* Always show 4 placeholder options */}
                         {[...Array(4)].map((_, index) => (
                             <div 
                                 key={index} 
