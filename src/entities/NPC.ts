@@ -154,41 +154,33 @@ export class NPC {
 
     public update(): void {
         if (this.isMoving) {
-            const speed = (16 * this.moveSpeed) / PIXELS_PER_SECOND; // Convert to pixels per frame
-            let velocityX = 0;
-            let velocityY = 0;
+            const body = this.sprite.body as Phaser.Physics.Arcade.Body;
 
-            switch (this.currentDirection) {
-                case 'up':
-                    velocityY = -speed;
-                    break;
-                case 'down':
-                    velocityY = speed;
-                    break;
-                case 'left':
-                    velocityX = -speed;
-                    break;
-                case 'right':
-                    velocityX = speed;
-                    break;
-            }
-            console.log(`[NPC] Updating position with velocity: (${velocityX}, ${velocityY})`);
-            
-            // Update sprite position
-            this.sprite.x += velocityX;
-            this.sprite.y += velocityY;
-
-            // Update interaction zone position
+            // Update interaction zone position (sprite position is updated by physics)
             if (this.interactionZone) {
                 this.interactionZone.setPosition(this.sprite.x, this.sprite.y);
             }
 
-            // Check for collisions before checking for target position
+            // Check for collisions and map edges
             this.handleCollisions();
             this.handleEdgeOfMap();
-    
 
-            // Add at the end of existing update method
+            // If we have a target, check if we've reached it
+            if (this.hasReachedTarget()) {
+                this.isMoving = false;
+                this.state = 'idle';
+                body.setVelocity(0, 0);
+                // Inform server movement finished so it can schedule next move
+                this.scene.getNetworkManager().sendNPCMovementComplete({
+                    npcId: this.getId(),
+                    x: this.sprite.x,
+                    y: this.sprite.y
+                });
+                // Clear target to avoid repeated completion checks
+                this.targetPosition = null;
+            }
+
+            // Draw debug aids
             this.drawDebugTiles();
         }
         this.updateAnimation();
@@ -277,6 +269,8 @@ export class NPC {
             this.isMoving = false;
             this.state = 'idle';
             body.setVelocity(0, 0); // Stop all movement
+            // Clear any stale target to avoid re-triggering completion
+            this.targetPosition = null;
             
             // Prepare edge information for the server
             const currentEdges = { up: atTopEdge, down: atBottomEdge, left: atLeftEdge, right: atRightEdge };
@@ -594,19 +588,27 @@ export class NPC {
         else if (data.facing === 'left') body.setVelocity(-speed, 0);
         else if (data.facing === 'right') body.setVelocity(speed, 0);
         // Log velocity for debugging
-        console.log(`[NPC ${this.config.id}] Velocity set to (${body.velocity.x}, ${body.velocity.y})`);
+        console.log(`[NPC ${this.config.id}] Velocity set to (${body.velocity.x}, ${body.velocity.y}) towards (${data.targetX}, ${data.targetY})`);
         this.updateAnimation();
     }
 
     private hasReachedTarget(): boolean {
-        // Allow for a small threshold of error in position matching
-        const threshold = 1;
+        // Allow for a small threshold of error in position matching (quarter tile)
+        const threshold = TILE_SIZE / 4;
         const targetX = this.targetPosition?.x ?? this.sprite.x;
         const targetY = this.targetPosition?.y ?? this.sprite.y;
         console.log(`[NPC ${this.config.id}] Checking if reached target: (${this.sprite.x}, ${this.sprite.y}) vs (${targetX}, ${targetY})`);
         
-        return Math.abs(this.sprite.x - targetX) < threshold || 
-               Math.abs(this.sprite.y - targetY) < threshold;
+        const withinX = Math.abs(this.sprite.x - targetX) <= threshold;
+        const withinY = Math.abs(this.sprite.y - targetY) <= threshold;
+        if (withinX && withinY) {
+            // Snap to exact target to avoid drift
+            this.sprite.setPosition(targetX, targetY);
+            const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+            body.reset(targetX, targetY);
+            return true;
+        }
+        return false;
     }
 
     private drawDebugTiles(): void {

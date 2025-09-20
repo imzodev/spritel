@@ -1,4 +1,4 @@
-import { Server } from "bun";
+import { Server, type ServerWebSocket } from "bun";
 import { handleAIChatRequest, handleAIChatWithMemoryRequest } from "./routes/ai";
 import { cors } from "./middleware/cors";
 import { NPCState, TilePosition, NPCMovementState } from '../src/types/npc';
@@ -132,7 +132,8 @@ function initializeNPCMovement(): NPCMovementState {
 }
 
 const THROTTLE_INTERVAL = 5000; // 5 seconds
-let lastPathUpdate = Date.now();
+// Track last path update per-NPC to avoid global throttling issues
+const lastPathUpdateByNpc: Map<string, number> = new Map();
 
 function generateNewPath(npc: NPCState, isIntervalUpdate: boolean = false): void {
   const now = Date.now();
@@ -143,56 +144,100 @@ function generateNewPath(npc: NPCState, isIntervalUpdate: boolean = false): void
     return;
   }
 
-  // For collision updates (non-interval), check if we're within the throttle period
-  if (!isIntervalUpdate && (now - lastPathUpdate) < THROTTLE_INTERVAL) {
-    console.log(`[Server] Path already generated this interval, skipping`);
-    return;
+  // Throttle only interval updates per-NPC
+  if (isIntervalUpdate) {
+    const last = lastPathUpdateByNpc.get(npc.id) || 0;
+    if (now - last < THROTTLE_INTERVAL) {
+      return;
+    }
   }
-
-  
-  // Only update lastPathUpdate for collision-triggered updates
-  if (!isIntervalUpdate) {
-    lastPathUpdate = now;
-  }
-
 
   // Get current position
   const currentX = npc.x;
   const currentY = npc.y;
-  
+
+  // Keep NPCs 1 tile away from edges
+  const buffer = TILE_SIZE; // 1 tile buffer
+  const safeLeft = 0 + buffer;
+  const safeRight = MAP_WIDTH - buffer;
+  const safeTop = 0 + buffer;
+  const safeBottom = MAP_HEIGHT - buffer;
+
   // Define possible directions excluding current facing direction
   const directions: ("up" | "down" | "left" | "right")[] = ['up', 'down', 'left', 'right'];
-  const availableDirections = directions.filter(dir => dir !== npc.facing);
-  const newDirection = availableDirections[Math.floor(Math.random() * availableDirections.length)];
-  
-  // Calculate target coordinates based on direction
-  const distance = (Math.floor(Math.random() * 3) + 2) * TILE_SIZE; // 2-4 tiles worth of distance
-  let targetX = currentX;
-  let targetY = currentY;
+  let candidates = directions.filter(dir => dir !== npc.facing);
 
-  switch (newDirection) {
-    case 'up': targetY -= distance; break;
-    case 'down': targetY += distance; break;
-    case 'left': targetX -= distance; break;
-    case 'right': targetX += distance; break;
+  // Random distance in tiles (2-4 tiles)
+  const distance = (Math.floor(Math.random() * 3) + 2) * TILE_SIZE;
+
+  // Filter out directions that would go out of the safe bounds
+  const viable: { dir: 'up'|'down'|'left'|'right'; tx: number; ty: number }[] = [];
+  for (const dir of candidates) {
+    let tx = currentX;
+    let ty = currentY;
+    if (dir === 'up') ty -= distance;
+    if (dir === 'down') ty += distance;
+    if (dir === 'left') tx -= distance;
+    if (dir === 'right') tx += distance;
+
+    // Clamp to global map bounds first
+    tx = Math.min(Math.max(tx, 0), MAP_WIDTH - TILE_SIZE);
+    ty = Math.min(Math.max(ty, 0), MAP_HEIGHT - TILE_SIZE);
+
+    // Check safe buffer
+    const withinSafe = (tx >= safeLeft && tx <= safeRight) && (ty >= safeTop && ty <= safeBottom);
+    // Ensure actual movement along chosen axis
+    const movesEnough = (Math.abs(tx - currentX) >= TILE_SIZE) || (Math.abs(ty - currentY) >= TILE_SIZE);
+
+    if (withinSafe && movesEnough) {
+      viable.push({ dir, tx, ty });
+    }
   }
 
-  // Clamp target coordinates so that NPC remains fully within map boundaries (map 0,0)
-  targetX = Math.min(Math.max(targetX, 0), MAP_WIDTH - TILE_SIZE);
-  targetY = Math.min(Math.max(targetY, 0), MAP_HEIGHT - TILE_SIZE);
+  // If no viable directions, relax by allowing the current facing as well
+  if (viable.length === 0) {
+    for (const dir of directions) {
+      let tx = currentX;
+      let ty = currentY;
+      if (dir === 'up') ty -= distance;
+      if (dir === 'down') ty += distance;
+      if (dir === 'left') tx -= distance;
+      if (dir === 'right') tx += distance;
+      tx = Math.min(Math.max(tx, 0), MAP_WIDTH - TILE_SIZE);
+      ty = Math.min(Math.max(ty, 0), MAP_HEIGHT - TILE_SIZE);
+      const withinSafe = (tx >= safeLeft && tx <= safeRight) && (ty >= safeTop && ty <= safeBottom);
+      const movesEnough = (Math.abs(tx - currentX) >= TILE_SIZE) || (Math.abs(ty - currentY) >= TILE_SIZE);
+      if (withinSafe && movesEnough) {
+        viable.push({ dir, tx, ty });
+      }
+    }
+  }
+
+  // If still no viable direction, bail out gracefully
+  if (viable.length === 0) {
+    console.log(`[Server] NPC ${npc.id} has no viable direction; will retry later.`);
+    // Update throttle timestamp to avoid hammering
+    lastPathUpdateByNpc.set(npc.id, now);
+    return;
+  }
+
+  // Choose one viable option at random
+  const choice = viable[Math.floor(Math.random() * viable.length)];
 
   broadcast({
     type: 'npc-movement-instruction',
     npcId: npc.id,
-    targetX: targetX,
-    targetY: targetY,
-    facing: newDirection,
+    targetX: choice.tx,
+    targetY: choice.ty,
+    facing: choice.dir,
     state: 'walking'
   });
 
   npc.state = 'walking';
-  npc.facing = newDirection;
+  npc.facing = choice.dir;
   npc.movementState.isMoving = false;
+  // Record last update for interval throttling
+  lastPathUpdateByNpc.set(npc.id, now);
 }
 
 function getFacingFromDirection(direction: { x: number, y: number }): 'up' | 'down' | 'left' | 'right' {
@@ -258,7 +303,7 @@ async function handleHttpRequest(req: Request): Promise<Response> {
   return response;
 }
 
-const server = Bun.serve<{ id: string }>({
+const server = Bun.serve({
   port: 3001,
   fetch(req, server) {
     // Try to upgrade to WebSocket
@@ -272,7 +317,7 @@ const server = Bun.serve<{ id: string }>({
     return handleHttpRequest(req);
   },
   websocket: {
-    open(ws) {
+    open(ws: ServerWebSocket<{ id: string }>) {
       const id = ws.data.id;
       connectedClients.add(ws);
 
@@ -306,7 +351,7 @@ const server = Bun.serve<{ id: string }>({
         player: state.players.get(id),
       }, ws);
     },
-    message(ws, message) {
+    message(ws: ServerWebSocket<{ id: string }>, message) {
       const data = JSON.parse(String(message));
       const playerId = ws.data.id;
 
@@ -414,7 +459,7 @@ const server = Bun.serve<{ id: string }>({
           break;
       }
     },
-    close(ws) {
+    close(ws: ServerWebSocket<{ id: string }>) {
       const playerId = ws.data.id;
       const player = state.players.get(playerId);
       const mapPosition = player?.mapPosition; // Get the last known map position
@@ -445,7 +490,7 @@ const server = Bun.serve<{ id: string }>({
 
 function broadcast(
   message: any, 
-  sender?: { data: { id: string } },
+  sender?: { data: { id: string } } | any,
   mapPosition?: { x: number, y: number }
 ) {
   const messageStr = JSON.stringify(message);
