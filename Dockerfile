@@ -6,6 +6,11 @@ WORKDIR /usr/src/app
 COPY package.json bun.lockb* ./
 RUN bun install
 
+# Install OpenSSL for Prisma binary compatibility
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends openssl && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy source
 COPY . .
 
@@ -19,4 +24,4 @@ RUN bunx prisma generate
 # Expose ports
 EXPOSE 3001 5173
 
-ENTRYPOINT ["/usr/src/app/scripts/entrypoint.sh"]
+ENTRYPOINT ["sh", "/usr/src/app/scripts/entrypoint.sh"]
