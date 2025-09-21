@@ -144,6 +144,7 @@ model User {
   name      String?  @db.VarChar(120)
   email     String   @unique @db.VarChar(191)
   password  String   @db.VarChar(191) // store a hash, not plaintext
+  isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
