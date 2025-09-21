@@ -12,7 +12,10 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "prisma:generate": "bunx prisma generate",
+    "prisma:migrate": "bunx prisma migrate dev --name init",
+    "prisma:studio": "bunx prisma studio"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
@@ -24,7 +27,8 @@
     "phaser": "^3.88.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tailwindcss": "^4.0.9"
+    "tailwindcss": "^4.0.9",
+    "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
@@ -42,6 +46,7 @@
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
     "vite": "^6.2.0",
-    "vitest": "^1.0.0"
+    "vitest": "^1.0.0",
+    "prisma": "^5.22.0"
   }
 }

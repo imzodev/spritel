@@ -1,0 +1,55 @@
+version: '3.9'
+services:
+  db:
+    image: mysql:8.0
+    container_name: spritel_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: spritel
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - '3306:3306'
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - db_data:/var/lib/mysql
+
+  adminer:
+    image: adminer:latest
+    container_name: spritel_adminer
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    ports:
+      - '8080:8080'
+    depends_on:
+      - db
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spritel_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NODE_ENV: development
+    ports:
+      - '3001:3001'
+      - '5173:5173'
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+
+volumes:
+  db_data:
