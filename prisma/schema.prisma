@@ -137,3 +137,15 @@ model Transaction {
 
   @@index([playerId, createdAt], name: "idx_transactions_player_time")
 }
+
+// New: Users table (mapped to `users`)
+model User {
+  id        String   @id @db.Char(36)
+  name      String?  @db.VarChar(120)
+  email     String   @unique @db.VarChar(191)
+  password  String   @db.VarChar(191) // store a hash, not plaintext
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
