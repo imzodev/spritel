@@ -1,12 +1,12 @@
-# Database Migrations and Deployment (Prisma + MySQL + Docker)
+# Database Migrations and Deployment (Prisma + MySQL)
 
 This document explains exactly how database schema changes are created, applied, and automated for this project. It is designed so any engineer or AI agent can deploy or evolve the schema safely.
 
 - Stack
-  - MySQL 8 (container): `docker-compose.yml` service `db`
+  - MySQL 8 (local or container)
   - Prisma ORM (schema + migrations): `prisma/schema.prisma`, `prisma/migrations/`
-  - Bun app (container): `docker-compose.yml` service `app`
-  - Admin GUI (optional): Adminer at http://localhost:8080
+  - Bun app (local or container)
+  - Admin GUI (optional): Adminer (if using Docker) at http://localhost:8080
 - Goal
   - Zero-manual DB setup on deploy/start
   - Safe, repeatable schema evolution via Prisma migrations
@@ -14,29 +14,59 @@ This document explains exactly how database schema changes are created, applied,
 
 ## Key Files
 
-- `docker-compose.yml`
+- `docker-compose.yml` (if using Docker)
   - Services: `db`, `adminer`, `app`
   - `db` has a healthcheck; `app` waits on `db` to be healthy.
-- `Dockerfile`
+- `Dockerfile` (if using Docker)
   - Installs dependencies + OpenSSL (required by Prisma)
   - Runs Prisma generate at build time
   - Uses `scripts/entrypoint.sh` as the container entrypoint
-- `scripts/entrypoint.sh`
-  - On container start:
-    1) If no migrations exist, create initial migration: `prisma migrate dev --name init`
-    2) Always apply pending migrations: `prisma migrate deploy`
-    3) Generate Prisma client: `prisma generate`
-    4) Start the app (dev: Vite + server, prod: server only)
+- `scripts/entrypoint.sh` (if using Docker)
+  - On container start: applies committed migrations via `prisma migrate deploy`, generates client, then starts the app.
+  - Note: do NOT rely on `migrate dev` in entrypoint for production. Generate migrations in dev, commit them, and deploy.
 - `prisma/schema.prisma`
   - All models: `Item`, `Player`, `PlayerInventory`, `PlayerEquipment`, `Skill`, `PlayerSkill`, `MerchantStock`, `Transaction`
   - Datasource includes `shadowDatabaseUrl` for privileged shadow DB creation
 - `.env` / `.env.example`
-  - `DATABASE_URL` for Prisma (non-root)
-  - `SHADOW_DATABASE_URL` for Prisma shadow DB (root)
-  - `MYSQL_*` for the DB container
+  - `DATABASE_URL` Prisma connection URL
+  - `SHADOW_DATABASE_URL` Prisma shadow DB (dev-only, used by `migrate dev`)
+  - `MYSQL_*` (if using Docker DB)
   - `VITE_API_URL` for the client
 - `package.json` (scripts)
   - `prisma:generate`, `prisma:migrate`, `prisma:studio`
+
+## Local MySQL (no Docker) — Quickstart (Recommended for Dev)
+
+1) Create databases (root user shown; adjust as needed):
+```
+mysql -uroot -p -h127.0.0.1 -e "\
+CREATE DATABASE IF NOT EXISTS spritel CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; \
+CREATE DATABASE IF NOT EXISTS spritel_shadow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+2) Set `.env` for local:
+```
+DATABASE_URL="mysql://root:<root-password>@127.0.0.1:3306/spritel"
+SHADOW_DATABASE_URL="mysql://root:<root-password>@127.0.0.1:3306/spritel_shadow"
+```
+
+3) Baseline (first time only):
+```
+bunx prisma generate
+bunx prisma migrate dev --name init
+```
+
+4) Day-to-day change:
+```
+# Edit prisma/schema.prisma
+bunx prisma migrate dev --name <describe_change>
+```
+
+5) Commit migrations:
+```
+git add prisma/migrations/*
+git commit -m "feat(db): <describe_change>"
+```
 
 ## Environment Variables
 
@@ -58,10 +88,10 @@ VITE_API_URL="http://localhost:3001"
 ```
 
 Notes
-- The DB host `db` works inside containers. When running Prisma from your host shell, use `127.0.0.1` instead.
-- The shadow DB is only used by `migrate dev` to diff the schema. It needs a privileged user (root).
+- Use `127.0.0.1` for local MySQL from your host shell. Use `db` only inside Docker networks.
+- The shadow DB is only used by `prisma migrate dev` (development) to safely compute diffs and validate migrations. It is not used by `migrate deploy` in production.
 
-## First-Time Bootstrap (Fully Automatic)
+## First-Time Bootstrap (Docker)
 
 1) Build the app image (includes OpenSSL + Prisma client)
 ```
@@ -79,10 +109,7 @@ docker compose up -d app
 ```
 docker compose logs -f app
 ```
-You should see:
-- `[entrypoint] No Prisma migrations found. Creating initial migration (init).`
-- `Applying migrations (deploy)`
-- `Generating Prisma client`
+You should see `Applying migrations (deploy)` and app startup. Generate migrations in development prior to deployment.
 
 5) Verify tables in Adminer: http://localhost:8080
 - Server: `db`
@@ -108,9 +135,9 @@ This will:
 
 ## Deployment (Applying Migrations Automatically)
 
-- On container start, `scripts/entrypoint.sh` runs:
+- On app start, `scripts/entrypoint.sh` (or your process manager) runs:
   - `prisma migrate deploy` (idempotent) to apply any pending committed migrations
-- No manual `docker exec` required in CI/CD or prod environments.
+- No manual commands required in CI/CD or prod if migrations are committed.
 
 ## Running Prisma From Host (Optional)
 
@@ -127,8 +154,8 @@ This is useful for creating migrations the first time if you prefer not to rely 
 ## Common Pitfalls & Fixes
 
 - P3014 (Shadow DB could not be created)
-  - Cause: Prisma `migrate dev` needs to create a shadow DB; non-root user lacks privileges.
-  - Fix: Set `shadowDatabaseUrl` in `prisma/schema.prisma` and add `SHADOW_DATABASE_URL` (root) in `.env`.
+  - Cause: `migrate dev` needs to create a shadow DB; the user lacks privileges or the URL is wrong.
+  - Fix: Ensure `shadowDatabaseUrl` is set and `SHADOW_DATABASE_URL` has sufficient privileges.
 
 - P1001 (Cannot reach `db:3306` from host)
   - Cause: `db` only resolves inside Docker network.
@@ -164,7 +191,7 @@ This is useful for creating migrations the first time if you prefer not to rely 
 - Start app: `docker compose up -d app`
 - Tail app logs: `docker compose logs -f app`
 - Prisma client: `bun run prisma:generate`
-- Create dev migration: `bunx prisma migrate dev --name <change>`
+- Create dev migration (local MySQL): `bunx prisma migrate dev --name <change>`
 - Migration status (in container): `docker compose exec app sh -lc 'bunx prisma migrate status'`
 - Reset DB (destructive): `docker compose down -v`
 
