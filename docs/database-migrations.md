@@ -139,6 +139,58 @@ This will:
   - `prisma migrate deploy` (idempotent) to apply any pending committed migrations
 - No manual commands required in CI/CD or prod if migrations are committed.
 
+## Production (Docker) — How to Deploy
+
+1) Prepare `.env` on the server (not committed):
+```
+NODE_ENV=production
+MYSQL_ROOT_PASSWORD=<root-password>
+MYSQL_USER=<app-user>
+MYSQL_PASSWORD=<app-password>
+
+# App connects to MySQL by compose service name `db`
+DATABASE_URL="mysql://<app-user>:<app-password>@db:3306/spritel"
+```
+
+2) Build and start with the production compose:
+```
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+3) Verify logs:
+```
+docker compose -f docker-compose.prod.yml logs -f app
+```
+You should see `Applying migrations (deploy)` and then the server starting.
+
+Notes
+- Generate migrations in development with `migrate dev`, commit them, then deploy. Do not generate migrations in production.
+- The MySQL service uses a persistent volume (`db_data`). Back up regularly.
+
+## CI Guardrails (optional but recommended)
+
+In CI, fail a build if schema changed without a migration:
+```
+# pseudo-steps
+bunx prisma generate
+test -d prisma/migrations || { echo "No migrations"; exit 1; }
+
+# build image
+docker build -t your/app:$(git rev-parse --short HEAD) .
+```
+
+## Baselining (P3005) quick-fix (development only)
+
+If you see `P3005: database schema is not empty` during `migrate dev`:
+```
+# Mark the last migration as applied (choose the folder name you expect in DB):
+bunx prisma migrate resolve --applied <last_migration_folder>
+
+# Re-run migrate dev
+bunx prisma migrate dev --name <describe_change>
+```
+If the DB was changed without migrations (drift), consider resetting dev DB or using `prisma migrate diff` to generate a baseline migration, then `migrate resolve --applied`.
+
 ## Running Prisma From Host (Optional)
 
 If you want to run Prisma locally while the DB runs in Docker, use a host-reachable URL:
