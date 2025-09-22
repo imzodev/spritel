@@ -1,5 +1,5 @@
-import { prisma, lucia, validateRequest } from "../auth/lucia";
-import { hashPassword, verifyPassword, validatePassword } from "../utils/password";
+import { prisma as realPrisma, lucia as realLucia, validateRequest as realValidateRequest } from "../auth/lucia";
+import { hashPassword as realHashPassword, verifyPassword as realVerifyPassword, validatePassword as realValidatePassword } from "../utils/password";
 
 function json(data: any, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -16,7 +16,24 @@ function setCookieHeaders(res: Response, cookies: string[]) {
   cookies.forEach((c) => res.headers.append("Set-Cookie", c));
 }
 
-export async function routeAuth(req: Request): Promise<Response> {
+export type AuthDeps = {
+  prisma: typeof realPrisma;
+  lucia: typeof realLucia;
+  validateRequest: typeof realValidateRequest;
+  hashPassword: typeof realHashPassword;
+  verifyPassword: typeof realVerifyPassword;
+  validatePassword: typeof realValidatePassword;
+};
+
+export function createAuthRouter(deps?: Partial<AuthDeps>) {
+  const prisma = deps?.prisma ?? (realPrisma as any);
+  const lucia = deps?.lucia ?? (realLucia as any);
+  const validateRequest = deps?.validateRequest ?? realValidateRequest;
+  const hashPassword = deps?.hashPassword ?? realHashPassword;
+  const verifyPassword = deps?.verifyPassword ?? realVerifyPassword;
+  const validatePassword = deps?.validatePassword ?? realValidatePassword;
+
+  return async function routeAuth(req: Request): Promise<Response> {
   const path = getPath(req);
   try {
     if (req.method === "POST" && path === "/api/auth/register") {
@@ -90,4 +107,8 @@ export async function routeAuth(req: Request): Promise<Response> {
     console.error("/api/auth error", err);
     return json({ error: "Internal Server Error" }, { status: 500 });
   }
+  };
 }
+
+// Default router using real dependencies
+export const routeAuth = createAuthRouter();
