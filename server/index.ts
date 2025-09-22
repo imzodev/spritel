@@ -1,6 +1,7 @@
 import { Server, type ServerWebSocket } from "bun";
 import { handleAIChatRequest, handleAIChatWithMemoryRequest } from "./routes/ai";
 import { cors } from "./middleware/cors";
+import { routeAuth } from "./routes/auth";
 import { NPCState, TilePosition, NPCMovementState } from '../src/types/npc';
 
 // Constants for tile-based calculations
@@ -274,7 +275,8 @@ async function handleHttpRequest(req: Request): Promise<Response> {
   let response: Response;
 
   // Serve frontend for root route
-  if (req.url.endsWith('/')) {
+  const url = new URL(req.url);
+  if (url.pathname === '/' || req.url.endsWith('/')) {
     try {
       const file = await Bun.file('./dist/index.html');
       response = new Response(file, {
@@ -290,6 +292,10 @@ async function handleHttpRequest(req: Request): Promise<Response> {
   }
   else if (req.url.includes('/api/ai/chat-with-memory')) {
     response = await handleAIChatWithMemoryRequest(req);
+  }
+  // Auth routes
+  else if (url.pathname.startsWith('/api/auth')) {
+    response = await routeAuth(req);
   }
   else {
     response = new Response('Route not found', { status: 404 });
