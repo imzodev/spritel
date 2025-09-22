@@ -1,0 +1,153 @@
+// Prisma schema for MySQL
+// Run: bunx prisma generate && bunx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Item {
+  id        String  @id @db.VarChar(64)
+  name      String  @db.VarChar(120)
+  type      ItemType
+  price     Int
+  stackable Boolean @default(false)
+  maxStack  Int     @default(1)
+  stats     Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  inventories PlayerInventory[]
+  equipments  PlayerEquipment[]  @relation("EquippedItems")
+  merchant    MerchantStock[]
+  transactions Transaction[]
+}
+
+enum ItemType {
+  consumable
+  equipment
+  material
+}
+
+model Player {
+  id        String   @id @db.Char(36)
+  name      String?  @db.VarChar(64)
+  gold      Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  inventories PlayerInventory[]
+  equipments  PlayerEquipment[]
+  skills      PlayerSkill[]
+  transactions Transaction[]
+}
+
+model PlayerInventory {
+  player    Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  playerId  String @db.Char(36)
+  item      Item   @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  itemId    String @db.VarChar(64)
+  qty       Int     @default(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([playerId, itemId])
+  @@index([playerId], name: "idx_player_inventories_player")
+}
+
+enum EquipSlot {
+  weapon
+  head
+  body
+  legs
+  feet
+  ring1
+  ring2
+  offhand
+}
+
+model PlayerEquipment {
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  playerId  String   @db.Char(36)
+  slot      EquipSlot
+  item      Item?    @relation(name: "EquippedItems", fields: [itemId], references: [id], onDelete: SetNull)
+  itemId    String?  @db.VarChar(64)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([playerId, slot])
+  @@index([playerId], name: "idx_player_equipment_player")
+}
+
+model Skill {
+  id        String   @id @db.VarChar(64)
+  name      String   @db.VarChar(120)
+  maxLevel  Int      @default(10) @map("max_level")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  players PlayerSkill[]
+}
+
+model PlayerSkill {
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  playerId  String   @db.Char(36)
+  skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  skillId   String   @db.VarChar(64)
+  level     Int      @default(0)
+  xp        Int      @default(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([playerId, skillId])
+  @@index([playerId], name: "idx_player_skills_player")
+}
+
+model MerchantStock {
+  merchantId   String   @db.VarChar(64)
+  item         Item     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  itemId       String   @db.VarChar(64)
+  qty          Int      @default(0)
+  priceOverride Int?     @map("price_override")
+  restockAt    DateTime? @map("restock_at")
+  restockRule  Json      @map("restock_rule")
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@id([merchantId, itemId])
+  @@index([merchantId], name: "idx_merchant_stock_merchant")
+}
+
+enum TransactionType {
+  buy
+  sell
+}
+
+model Transaction {
+  id         String   @id @default(uuid()) @db.Char(36)
+  player     Player?  @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  playerId   String?  @db.Char(36)
+  merchantId String?  @db.VarChar(64)
+  item       Item?    @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  itemId     String?  @db.VarChar(64)
+  qty        Int
+  unitPrice  Int      @map("unit_price")
+  type       TransactionType
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([playerId, createdAt], name: "idx_transactions_player_time")
+}
+
+// New: Users table (mapped to `users`)
+model User {
+  id        String   @id @db.Char(36)
+  name      String?  @db.VarChar(120)
+  email     String   @unique @db.VarChar(191)
+  password  String   @db.VarChar(191) // store a hash, not plaintext
+  isActive  Boolean  @default(true) @map("is_active")
+  birthdate DateTime? @map("birthdate")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
