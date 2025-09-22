@@ -148,6 +148,18 @@ model User {
   birthdate DateTime? @map("birthdate")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  // Lucia sessions relation
+  sessions  Session[]
 
   @@map("users")
+}
+
+// Lucia Session model
+model Session {
+  id        String   @id @db.VarChar(191)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @db.Char(36)
+  expiresAt DateTime @map("expires_at")
+
+  @@index([userId], name: "idx_session_user")
 }
