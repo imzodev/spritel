@@ -2,6 +2,7 @@ import { Server, type ServerWebSocket } from "bun";
 import { handleAIChatRequest, handleAIChatWithMemoryRequest } from "./routes/ai";
 import { cors } from "./middleware/cors";
 import { routeAuth } from "./routes/auth";
+import { validateRequest } from "./auth/lucia";
 import { NPCState, TilePosition, NPCMovementState } from '../src/types/npc';
 
 // Constants for tile-based calculations
@@ -312,18 +313,30 @@ async function handleHttpRequest(req: Request): Promise<Response> {
 const server = Bun.serve({
   port: 3001,
   fetch(req, server) {
-    // Try to upgrade to WebSocket
-    if (server.upgrade(req, {
-      data: { id: crypto.randomUUID() }
-    })) {
-      return;
+    // Authenticate WebSocket upgrade using Lucia session
+    const url = new URL(req.url);
+    if (url.protocol.startsWith('http')) {
+      // Only handle WS upgrades if it's a WebSocket request
+      if (req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+        return (async () => {
+          const { user } = await validateRequest(req);
+          if (!user) {
+            return new Response('Unauthorized', { status: 401 });
+          }
+          const ok = server.upgrade(req, {
+            data: { id: crypto.randomUUID(), userId: (user as any).id }
+          });
+          if (ok) return;
+          return new Response('Upgrade failed', { status: 500 });
+        })();
+      }
     }
     
     // If not a WebSocket request, handle as HTTP API request
     return handleHttpRequest(req);
   },
   websocket: {
-    open(ws: ServerWebSocket<{ id: string }>) {
+    open(ws: ServerWebSocket<{ id: string; userId?: string }>) {
       const id = ws.data.id;
       connectedClients.add(ws);
 
@@ -357,7 +370,7 @@ const server = Bun.serve({
         player: state.players.get(id),
       }, ws);
     },
-    message(ws: ServerWebSocket<{ id: string }>, message) {
+    message(ws: ServerWebSocket<{ id: string; userId?: string }>, message) {
       const data = JSON.parse(String(message));
       const playerId = ws.data.id;
 
