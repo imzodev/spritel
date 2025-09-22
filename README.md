@@ -28,13 +28,26 @@ First, install dependencies:
 bun install
 ```
 
-To enable AI-powered NPC conversations, create a `.env` file in the project root based on the `.env.example` file and add your OpenAI API key:
+Create a `.env` file in the project root based on the `.env.example` file. For AI and auth features you will at least need:
 
 ```
 OPENAI_API_KEY=your_openai_api_key_here
+DATABASE_URL=mysql://user:pass@127.0.0.1:3306/spritel
+SHADOW_DATABASE_URL=mysql://user:pass@127.0.0.1:3306/spritel_shadow
+LUCIA_SESSION_COOKIE_NAME=spritel_session
+SESSION_TTL=2592000 # 30 days in seconds
+VITE_API_BASE=http://localhost:3001 # optional for dev if API runs on a separate origin
 ```
 
-To start both the game client and WebSocket server:
+Install dependencies and set up the database schema:
+
+```bash
+bun install
+bunx prisma generate
+bunx prisma migrate dev --name init # or latest migration name
+```
+
+To start both the game client and WebSocket+HTTP API server:
 
 ```bash
 bun run dev:all
@@ -71,6 +84,62 @@ The game uses a WebSocket server for real-time communication between players. Fe
 - Player join/leave events
 - Map-specific player interactions
 - Physics-based collision detection
+
+## Authentication (Lucia + Prisma + Oslo)
+
+This project uses session-based authentication via Lucia with a Prisma adapter and Argon2id hashing using Oslo.
+
+### Environment
+
+Set the following in `.env`:
+
+- `DATABASE_URL` and `SHADOW_DATABASE_URL` for Prisma
+- `LUCIA_SESSION_COOKIE_NAME` (default `spritel_session`)
+- `SESSION_TTL` (in seconds, e.g., `2592000` for 30 days)
+- `VITE_API_BASE` (optional; client base URL for API calls in dev)
+
+### Prisma
+
+Generate the client and run migrations after updating `prisma/schema.prisma`:
+
+```bash
+bunx prisma generate
+bunx prisma migrate dev --name add_lucia_session
+```
+
+### HTTP Endpoints
+
+Base URL: `http://localhost:3001`
+
+- `POST /api/auth/register` — body: `{ email, password, name? }` — creates user, sets session cookie, returns `{ user }`
+- `POST /api/auth/login` — body: `{ email, password }` — verifies, sets session cookie, returns `{ user }`
+- `GET /api/auth/me` — returns `{ user|null }` based on session
+- `POST /api/auth/logout` — invalidates session, clears cookie
+
+Notes:
+
+- CORS is configured to reflect the incoming `Origin` and allow credentials.
+- Cookies are HttpOnly and will be sent/received by the browser when `withCredentials: true` is used on the client.
+
+### Client usage
+
+The client uses Axios with `withCredentials: true` and an optional `VITE_API_BASE`.
+
+- Service functions in `src/services/auth.ts`: `register`, `login`, `me`, `logout`.
+- Minimal UI component `src/components/AuthForm.tsx` to log in or register from the main screen.
+- App gating in `src/App.tsx`:
+  - If not authenticated, show Auth form
+  - If authenticated without a created character, show the welcome/character creation screen
+  - If authenticated and character exists, load the game
+
+### WebSocket Authentication
+
+The server validates WebSocket upgrades using the Lucia session cookie:
+
+- Unauthenticated upgrades are rejected with HTTP 401.
+- Authenticated upgrades attach `userId` to `ws.data`.
+
+When testing across origins, ensure your UI sends the `Origin` header and the browser is allowed to include cookies (use `withCredentials: true`).
 
 ## ESLint Configuration
 
