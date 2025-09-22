@@ -1,19 +1,13 @@
-import { useEffect, useState } from 'react'
-import { login, register, me, logout, type UserDto } from '../services/auth'
+import { useState } from 'react'
+import { login, register, type UserDto } from '../services/auth'
 
 export default function AuthForm({ onAuthed }: { onAuthed?: (user: UserDto) => void }) {
   const [mode, setMode] = useState<'login'|'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [user, setUser] = useState<UserDto | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // fetch current session user on mount
-    me().then(u => setUser(u)).catch(() => setUser(null))
-  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -26,7 +20,6 @@ export default function AuthForm({ onAuthed }: { onAuthed?: (user: UserDto) => v
       } else {
         u = await login(email, password)
       }
-      setUser(u)
       onAuthed?.(u)
       setPassword('')
     } catch (err: any) {
@@ -34,27 +27,6 @@ export default function AuthForm({ onAuthed }: { onAuthed?: (user: UserDto) => v
     } finally {
       setLoading(false)
     }
-  }
-
-  async function handleLogout() {
-    setLoading(true)
-    try {
-      await logout()
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (user) {
-    return (
-      <div className="p-4 border rounded bg-white/70 max-w-md">
-        <div className="mb-2 text-sm text-gray-700">Logged in as <b>{user.email}</b></div>
-        <button className="px-3 py-2 bg-gray-800 text-white rounded" onClick={handleLogout} disabled={loading}>
-          {loading ? '…' : 'Logout'}
-        </button>
-      </div>
-    )
   }
 
   return (
