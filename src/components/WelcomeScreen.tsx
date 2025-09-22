@@ -58,6 +58,11 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
     
     // Simulate loading time
     setTimeout(() => {
+      try {
+        // Persist minimal character creation so the app knows a player exists
+        localStorage.setItem('spritel_player_name', playerName.trim());
+        localStorage.setItem('spritel_player_class', characterClass);
+      } catch {}
       onStart();
     }, 1000);
   };
