@@ -1,6 +1,7 @@
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '' // e.g., '' or 'http://localhost:3001'
+// Prefer VITE_API_URL; fallback to VITE_API_BASE for backward compatibility
+const API_BASE = (import.meta as any).env?.VITE_API_URL ?? (import.meta as any).env?.VITE_API_BASE ?? ''
 
 export const http = axios.create({
   baseURL: API_BASE,
