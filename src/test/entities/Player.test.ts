@@ -89,7 +89,7 @@ describe('Player', () => {
     expect(mockSprite.setCollideWorldBounds).toHaveBeenCalledWith(true)
     expect(mockSprite.body.setSize).toHaveBeenCalledWith(20, 20)
     expect(mockSprite.body.setOffset).toHaveBeenCalledWith(22, 42)
-    expect(mockSprite.setDepth).toHaveBeenCalledWith(20)
+    expect(mockSprite.setDepth).toHaveBeenCalledWith(29)
   })
 
   it('should create all required animations', () => {
