@@ -5,6 +5,7 @@ import AuthForm from './components/AuthForm'
 import type { UserDto } from './services/auth'
 import { me, logout } from './services/auth'
 import PauseMenu from './components/PauseMenu'
+import DonationButton from './components/DonationButton'
 
 function App() {
   const [currentUser, setCurrentUser] = useState<UserDto | null>(null)
@@ -49,6 +50,8 @@ function App() {
 
   return (
     <div className="w-full h-full">
+      {/* Global Donation Button (top-left corner) */}
+      <DonationButton />
       {/* Pause Menu modal */}
       <PauseMenu
         open={showMenu}
