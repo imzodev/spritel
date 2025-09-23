@@ -1,10 +1,14 @@
 /* @vitest-environment node */
+import 'dotenv/config'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createAuthRouter } from '../routes/auth'
 import { hashPassword } from '../utils/password'
 
+// Base URL: prefer VITE_API_URL from .env, fallback to localhost:3001
+const TEST_BASE_URL = process.env.VITE_API_URL || 'http://localhost:3001'
+
 function buildReq(method: string, path: string, body?: any, cookie?: string) {
-  return new Request('http://localhost:3001' + path, {
+  return new Request(TEST_BASE_URL + path, {
     method,
     headers: {
       'content-type': body ? 'application/json' : undefined,
