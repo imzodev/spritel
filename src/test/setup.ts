@@ -27,22 +27,24 @@ const mockCanvas = {
   height: 300,
 }
 
-// Mock WebSocket
-window.WebSocket = class MockWebSocket {
-  onopen: () => void = () => {}
-  onmessage: (event: any) => void = () => {}
-  onclose: () => void = () => {}
-  send: (data: any) => void = () => {}
-  close: () => void = () => {}
-} as any
+if (typeof window !== 'undefined') {
+  // Mock WebSocket
+  window.WebSocket = class MockWebSocket {
+    onopen: () => void = () => {}
+    onmessage: (event: any) => void = () => {}
+    onclose: () => void = () => {}
+    send: (data: any) => void = () => {}
+    close: () => void = () => {}
+  } as any
 
-// Mock HTMLCanvasElement
-window.HTMLCanvasElement.prototype.getContext = function(contextId: string) {
-  if (contextId === '2d') {
-    return mockCanvas.getContext() as CanvasRenderingContext2D;
-  }
-  return null;
-} as typeof window.HTMLCanvasElement.prototype.getContext;
+  // Mock HTMLCanvasElement
+  window.HTMLCanvasElement.prototype.getContext = function(contextId: string) {
+    if (contextId === '2d') {
+      return mockCanvas.getContext() as CanvasRenderingContext2D;
+    }
+    return null;
+  } as typeof window.HTMLCanvasElement.prototype.getContext;
 
-// Mock window properties used by Phaser
-Object.defineProperty(window, 'devicePixelRatio', { value: 1 })
+  // Mock window properties used by Phaser
+  Object.defineProperty(window, 'devicePixelRatio', { value: 1 })
+}

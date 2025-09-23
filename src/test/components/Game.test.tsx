@@ -2,102 +2,24 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
 import Game from '../../components/Game'
 import GameScene from '../../scenes/GameScene'
+import { setMockScene, mockGame } from '../mocks/phaser'
 
 // Define mock objects outside
 const mockGameScene = {
   setVirtualControlDirection: vi.fn(),
-  triggerVirtualAttack: vi.fn()
-};
-
-const mockGame = {
-  scene: {
-    getScene: vi.fn()
+  triggerVirtualAttack: vi.fn(),
+  events: {
+    on: vi.fn(),
+    off: vi.fn(),
   },
-  destroy: vi.fn()
 };
 
-// Mock Phaser at the top level
-vi.mock('phaser', () => {
-  class Scene {
-    add: any;
-    physics: any;
-    input: any;
-    cameras: any;
-    anims: any;
-    load: any;
-    scene: any;
+// Using shared mockGame from ../mocks/phaser
 
-    constructor() {
-      this.scene = { key: 'GameScene' };
-      this.add = {
-        sprite: vi.fn().mockReturnValue({
-          setScale: vi.fn().mockReturnThis(),
-          setDepth: vi.fn().mockReturnThis(),
-          play: vi.fn()
-        })
-      };
-      this.physics = {
-        add: {
-          sprite: vi.fn().mockReturnValue({
-            setVisible: vi.fn().mockReturnThis(),
-            setScale: vi.fn().mockReturnThis(),
-            body: { setSize: vi.fn() }
-          })
-        }
-      };
-      this.input = {
-        keyboard: {
-          createCursorKeys: vi.fn().mockReturnValue({}),
-          addKey: vi.fn()
-        }
-      };
-      this.cameras = {
-        main: {
-          startFollow: vi.fn(),
-          setZoom: vi.fn()
-        }
-      };
-      this.anims = {
-        create: vi.fn(),
-        generateFrameNumbers: vi.fn()
-      };
-      this.load = {
-        spritesheet: vi.fn(),
-        image: vi.fn()
-      };
-    }
-  }
-
-  const MockPhaser = {
-    Game: vi.fn().mockImplementation(() => {
-      return mockGame;
-    }),
-    Scene,
-    AUTO: 'AUTO',
-    Scale: {
-      FIT: 'FIT',
-      CENTER_BOTH: 'CENTER_BOTH',
-    },
-    Physics: {
-      ARCADE: 'ARCADE',
-    },
-    Input: {
-      Keyboard: {
-        KeyCodes: {
-          SPACE: 32,
-          LEFT: 37,
-          UP: 38,
-          RIGHT: 39,
-          DOWN: 40
-        }
-      }
-    }
-  };
-  return { default: MockPhaser };
-});
+// Using shared Phaser mock from setup.ts (src/test/mocks/phaser.ts)
 
 describe('Game Component', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
     
     // Reset mocks
@@ -107,10 +29,13 @@ describe('Game Component', () => {
     mockGameScene.triggerVirtualAttack.mockReset();
     
     // Setup mock game scene
-    mockGame.scene.getScene.mockReturnValue(mockGameScene);
+    setMockScene(mockGameScene);
     
-    // Mock requestAnimationFrame
-    window.requestAnimationFrame = vi.fn(cb => setTimeout(cb, 0));
+    // Mock requestAnimationFrame with proper typing
+    window.requestAnimationFrame = vi.fn((cb: FrameRequestCallback): number => {
+      const id = setTimeout(() => cb(0), 0) as unknown as number
+      return id
+    })
   });
 
   afterEach(() => {

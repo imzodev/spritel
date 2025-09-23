@@ -12,95 +12,6 @@ vi.mock('../../managers/MapManager')
 vi.mock('../../managers/NetworkManager')
 vi.mock('../../managers/NPCManager')
 
-// Mock Phaser
-const mockCollider = {
-    destroy: vi.fn()
-}
-
-const mockPhysicsAdd = {
-    collider: vi.fn().mockReturnValue(mockCollider),
-    sprite: vi.fn().mockReturnValue({
-        setVisible: vi.fn().mockReturnThis(),
-        setScale: vi.fn().mockReturnThis(),
-        setImmovable: vi.fn().mockReturnThis(),
-        body: {
-            setSize: vi.fn()
-        },
-        destroy: vi.fn()
-    })
-}
-
-const mockPhysicsWorld = {
-    removeCollider: vi.fn()
-}
-
-vi.mock('phaser', () => ({
-    default: {
-        Scene: class {
-            add: any
-            physics: any
-            load: any
-            cameras: any
-            anims: any
-            textures: any
-            scene: any
-            constructor() {
-                this.scene = { key: 'GameScene' }
-                this.add = {
-                    sprite: vi.fn().mockReturnValue({
-                        setScale: vi.fn().mockReturnValue({ 
-                            setDepth: vi.fn().mockReturnValue({
-                                play: vi.fn()
-                            })
-                        }),
-                        setDepth: vi.fn(),
-                        play: vi.fn(),
-                        destroy: vi.fn()
-                    })
-                }
-                this.physics = {
-                    add: mockPhysicsAdd,
-                    world: mockPhysicsWorld
-                }
-                this.load = {
-                    image: vi.fn(),
-                    spritesheet: vi.fn(),
-                    on: vi.fn()
-                }
-                this.cameras = {
-                    main: {
-                        startFollow: vi.fn(),
-                        setZoom: vi.fn()
-                    }
-                }
-                this.anims = {
-                    create: vi.fn(),
-                    exists: vi.fn().mockReturnValue(false),
-                    generateFrameNumbers: vi.fn().mockReturnValue([])
-                }
-                this.textures = {
-                    exists: vi.fn(),
-                    list: []
-                }
-            }
-        },
-        Physics: {
-            Arcade: {
-                Sprite: class {}
-            }
-        },
-        Input: {
-            Keyboard: {
-                JustDown: vi.fn().mockReturnValue(false),
-                KeyCodes: {
-                    SPACE: 32,
-                    E: 69
-                }
-            }
-        }
-    }
-}))
-
 describe('GameScene', () => {
     let gameScene: GameScene
     let mockPlayer: any
@@ -129,7 +40,8 @@ describe('GameScene', () => {
             checkMapTransition: vi.fn(),
             getCurrentMap: vi.fn().mockReturnValue({
                 key: 'map_0_0'
-            })
+            }),
+            getCurrentPosition: vi.fn().mockReturnValue({ x: 0, y: 0 })
         }
 
         mockNetworkManager = {
@@ -189,7 +101,7 @@ describe('GameScene', () => {
             gameScene.setCollisionLayer(mockLayer as any)
 
             expect(mockLayer.setCollisionByExclusion).toHaveBeenCalledWith([-1, 0])
-            expect(mockPhysicsAdd.collider).toHaveBeenCalled()
+            expect((gameScene as any).physics.add.collider).toHaveBeenCalled()
         })
 
         it('should handle null collision layer', () => {
@@ -204,7 +116,7 @@ describe('GameScene', () => {
             }
 
             gameScene.setCollisionLayer(mockLayer as any)
-            expect(mockPhysicsAdd.collider).not.toHaveBeenCalled()
+            expect((gameScene as any).physics.add.collider).not.toHaveBeenCalled()
         })
     })
 
@@ -305,7 +217,7 @@ describe('GameScene', () => {
 
             gameScene['handlePlayerUpdate'](playerData, 'network')
             
-            expect(mockMapManager.getCurrentMap).toHaveBeenCalled()
+            expect(mockMapManager.getCurrentPosition).toHaveBeenCalled()
             expect(gameScene['otherPlayers'].has('player1')).toBe(true)
         })
 
